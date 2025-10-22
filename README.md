@@ -1,6 +1,8 @@
 # MUD Dungeon System
 
-A sophisticated 3D space management system for text-based games, providing room-based environments with object containment, keyword identification, and flexible movement mechanics. Particularly suited for MUD (Multi-User Dungeon) style games.
+A 3D space management system for text-based games, providing room-based environments with object containment, keyword identification, and flexible movement mechanics.
+
+Particularly suited for MUD (Multi-User Dungeon) style games.
 
 ## Core Features
 
@@ -140,10 +142,6 @@ Features:
 ## Installation
 Don't install this. It's meant to be imported and/or read.
 
-```bash
-npm install jackindisguise/mud-dungeon-template
-```
-
 Dependencies:
 - [mud-ext](https://github.com/jackindisguise/mud-ext) - String matching utilities
 - TypeScript 5.5.0+ for development
@@ -151,9 +149,6 @@ Dependencies:
 ## Development
 
 ```bash
-# Install dev dependencies
-npm install
-
 # Run tests
 npm test
 
