@@ -1,3 +1,5 @@
+[![Static Badge](https://img.shields.io/badge/documentation-orange)]([https://jackindisguise.github.io/mud-ext/](https://jackindisguise.github.io/mud-dungeon-template/))
+
 # MUD Dungeon System
 
 A 3D space management system for text-based games, providing room-based environments with object containment, keyword identification, and flexible movement mechanics.
