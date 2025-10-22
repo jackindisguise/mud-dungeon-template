@@ -8,10 +8,15 @@
 	"main": "index.js",
 	"scripts": {
 		"build": "tsc",
-		"test": "npm run build && node --test \"dist/**/*.spec.js\""
+		"test": "npm run build && node --test \"dist/**/*.spec.js\"",
+		"doc": "npx typedoc src/*.ts"
 	},
 	"devDependencies": {
 		"@types/node": "^24.9.1",
+		"typedoc": "^0.28.14",
 		"typescript": "^5.5.0"
+	},
+	"dependencies": {
+		"mud-ext": "github:jackindisguise/mud-ext"
 	}
 }
