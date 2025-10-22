@@ -1,4 +1,4 @@
-[![Static Badge](https://img.shields.io/badge/documentation-orange)]([https://jackindisguise.github.io/mud-ext/](https://jackindisguise.github.io/mud-dungeon-template/))
+[![Static Badge](https://img.shields.io/badge/documentation-orange)](https://jackindisguise.github.io/mud-dungeon-template/)
 
 # MUD Dungeon System
 
