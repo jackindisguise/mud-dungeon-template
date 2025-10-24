@@ -187,21 +187,19 @@ export type MapDimensions = {
 };
 
 /**
- * Configuration options for creating a new Dungeon instance.
- * Currently only contains dimensions, but designed to be extensible for future options.
+ * Options for creating a `Dungeon` instance.
  *
- * @property dimensions - The size of the dungeon in all three dimensions
+ * Currently the only required option is `dimensions`, which describes the
+ * three-dimensional grid size for rooms. This type is intentionally simple so
+ * it can be extended in the future with additional configuration options.
+ *
+ * @property dimensions - The width/height/layers of the dungeon grid.
  *
  * @example
  * ```typescript
  * const options: DungeonOptions = {
- *   dimensions: {
- *     width: 10,
- *     height: 10,
- *     layers: 3
- *   }
+ *   dimensions: { width: 10, height: 10, layers: 3 }
  * };
- *
  * const dungeon = new Dungeon(options);
  * ```
  */
@@ -654,6 +652,28 @@ export class Dungeon {
 	}
 }
 
+/**
+ * Options used to construct or initialize a `DungeonObject`.
+ *
+ * These are helper parameters passed into `DungeonObject` and its subclasses
+ * to set initial metadata and optionally register the object with a `Dungeon`.
+ *
+ * @property keywords - Space-delimited identification keywords (e.g. "small coin"). Defaults to "dungeon object" when not set.
+ * @property display - Short, human-friendly name for the object (e.g. "Gold Coin"). Defaults to "Dungeon Object".
+ * @property description - Longer descriptive text shown when examining the object. Defaults to "It's an object.".
+ * @property dungeon - Optional `Dungeon` instance. When provided the object will be added to that dungeon's contents and inherit its dungeon reference.
+ *
+ * @example
+ * ```typescript
+ * const dungeon = new Dungeon();
+ * const coin = new DungeonObject({
+ *   keywords: "coin gold",
+ *   display: "Gold Coin",
+ *   description: "A small, shiny gold coin.",
+ *   dungeon
+ * });
+ * ```
+ */
 export type DungeonObjectOptions = {
 	keywords?: string;
 	display?: string;
@@ -1064,6 +1084,28 @@ export type Coordinates = {
 	z: number;
 };
 
+/**
+ * Options for creating a `Room`.
+ *
+ * This type includes the required `coordinates` property and inherits the
+ * general `DungeonObjectOptions` for metadata such as `keywords`, `display`,
+ * `description`, and an optional `dungeon` reference.
+ *
+ * @property coordinates - The location of the room inside the dungeon grid.
+ * @property keywords - Space-delimited keywords for identifying the room (from `DungeonObjectOptions`).
+ * @property display - Short human-friendly name for the room (from `DungeonObjectOptions`).
+ * @property description - Longer descriptive text (from `DungeonObjectOptions`).
+ * @property dungeon - Optional `Dungeon` to automatically register the room with.
+ *
+ * @example
+ * ```typescript
+ * const room = new Room({
+ *   coordinates: { x: 0, y: 0, z: 0 },
+ *   keywords: "start",
+ *   description: "The starting room of the dungeon."
+ * });
+ * ```
+ */
 export type RoomOptions = {
 	coordinates: Coordinates;
 } & DungeonObjectOptions;
@@ -1112,6 +1154,14 @@ export class Room extends DungeonObject {
 	 * @private
 	 */
 	private _coordinates: Coordinates;
+
+	/**
+	 * Links from this room to other rooms, overriding normal spatial relationships.
+	 * Links allow connections between any rooms regardless of their position.
+	 * @private
+	 */
+	private _links: RoomLink[] = [];
+
 	/**
 	 * Returns a shallow copy of the room's coordinates.
 	 * @returns The room coordinates as an object { x, y, z }
@@ -1173,6 +1223,33 @@ export class Room extends DungeonObject {
 	}
 
 	/**
+	 * Add a RoomLink to this room.
+	 * This method is called by RoomLink when it is constructed.
+	 *
+	 * @param link - The RoomLink to add
+	 * @internal
+	 */
+	addLink(link: RoomLink) {
+		if (!this._links.includes(link)) {
+			this._links.push(link);
+		}
+	}
+
+	/**
+	 * Remove a RoomLink from this room.
+	 * This method is called by RoomLink when it is removed.
+	 *
+	 * @param link - The RoomLink to remove
+	 * @internal
+	 */
+	removeLink(link: RoomLink) {
+		const index = this._links.indexOf(link);
+		if (index !== -1) {
+			this._links.splice(index, 1);
+		}
+	}
+
+	/**
 	 * Gets the room adjacent to this room in the specified direction.
 	 * Returns undefined if there is no room in that direction or if this room
 	 * is not part of a dungeon.
@@ -1195,6 +1272,14 @@ export class Room extends DungeonObject {
 	 * ```
 	 */
 	getStep(dir: DIRECTION) {
+		// First check for a linked room in this direction
+		for (const link of this._links) {
+			const destination = link.getDestination(this, dir);
+			if (destination) {
+				return destination;
+			}
+		}
+		// If no link handles this direction, use normal spatial navigation
 		return this.dungeon?.getStep(this, dir);
 	}
 
@@ -1474,8 +1559,8 @@ export class Movable extends DungeonObject {
 	 * ```
 	 */
 	getStep(dir: DIRECTION) {
-		if (!this.coordinates) return;
-		return this.dungeon?.getStep(this.coordinates, dir);
+		if (!(this.location instanceof Room)) return;
+		return this.location.getStep(dir);
 	}
 
 	/**
@@ -1556,5 +1641,194 @@ export class Movable extends DungeonObject {
 		this.move(exit);
 		if (this.location instanceof Room)
 			this.location.onEnter(this, dir2reverse(dir));
+	}
+}
+
+/**
+ * Represents a bidirectional portal between two rooms.
+ * Links override normal spatial relationships to create connections
+ * between any two rooms, regardless of their position in their respective dungeons.
+ *
+ * @example
+ * ```typescript
+ * // Create a portal between Midgar and Sector 7
+ * const midgarRoom = midgarDungeon.getRoom({ x: 5, y: 5, z: 0 });
+ * const sectorRoom = sector7Dungeon.getRoom({ x: 0, y: 0, z: 0 });
+ * const link = RoomLink.createTunnel(midgarRoom, DIRECTION.NORTH, sectorRoom);
+ *
+ * // The rooms are now connected via these directions
+ * assert(midgarRoom.getStep(DIRECTION.NORTH) === sectorRoom);
+ * assert(sectorRoom.getStep(DIRECTION.SOUTH) === midgarRoom);
+ * ```
+ */
+export class RoomLink {
+	/**
+	 * The originating endpoint for this link.
+	 *
+	 * Contains the source `room` instance and the `direction` (a DIRECTION
+	 * flag) that, when used with Room.getStep() from that room, should resolve
+	 * to the other endpoint. This property is private and intended for use
+	 * only by the RoomLink implementation and the Room class (via
+	 * addLink/removeLink).
+	 *
+	 * Example: `{ room: roomA, direction: DIRECTION.NORTH }` means "from
+	 * roomA moving NORTH you arrive at the other endpoint".
+	 * @private
+	 */
+	private _from: { room: Room; direction: DIRECTION };
+
+	/**
+	 * The destination endpoint for this link.
+	 *
+	 * Contains the target `room` and the `direction` on the target room that
+	 * represents the return traversal (the reverse direction). For two-way
+	 * links the Room.getStep() call on the destination room using this
+	 * direction will resolve back to the originating room.
+	 * @private
+	 */
+	private _to: { room: Room; direction: DIRECTION };
+
+	/**
+	 * When true the link only functions in the `from` -> `to` direction.
+	 *
+	 * A one-way link will be registered only on the `_from.room` so calls to
+	 * `getStep()` on the `_to.room` will not consider this link when resolving
+	 * movements. The flag is private and set at construction time.
+	 * @private
+	 */
+	private _oneWay: boolean = false;
+
+	/**
+	 * Create a RoomLink instance.
+	 *
+	 * Note: the constructor only initialises the link state and DOES NOT
+	 * register the link with either room. This keeps `new RoomLink(...)` free
+	 * of side-effects. Use `RoomLink.createTunnel(...)` which will construct
+	 * the link and register it with the rooms (registering the `_to` room is
+	 * skipped for one-way links).
+	 *
+	 * @param options.from.room The originating Room instance
+	 * @param options.from.direction The direction on the originating room that leads to the destination
+	 * @param options.to.room The destination Room instance
+	 * @param options.to.direction The (reverse) direction on the destination room that leads back to the origin
+	 * @param options.oneWay When true the link is one-way (from -> to only)
+	 *
+	 * @remarks
+	 * The constructor accepts explicit from/to directions. The `createTunnel`
+	 * factory provides a more ergonomic API and will infer the reverse
+	 * direction automatically; the constructor remains available for internal
+	 * or advanced usage where callers want to control both endpoints explicitly.
+	 */
+	private constructor(options: {
+		from: { room: Room; direction: DIRECTION };
+		to: { room: Room; direction: DIRECTION };
+		oneWay?: boolean;
+	}) {
+		this._from = options.from;
+		this._to = options.to;
+		this._oneWay = !!options.oneWay;
+	}
+
+	/**
+	 * Create and register a RoomLink between two rooms.
+	 *
+	 * This factory is the recommended way to create links because it performs
+	 * the necessary registration with the provided Room instances and infers
+	 * the reverse direction automatically. It never mutates the rooms in a way
+	 * that breaks invariants: the link is added to the `_from.room` and,
+	 * unless `oneWay` is true, also to the `_to.room`.
+	 *
+	 * @param fromRoom The room which will act as the source endpoint
+	 * @param direction The direction (on `fromRoom`) that will lead to `toRoom`
+	 * @param toRoom The room which will act as the destination endpoint
+	 * @param oneWay When true only `fromRoom` will register the link; traversal back from `toRoom` will not use this link
+	 * @returns The created RoomLink instance (already registered on the appropriate rooms)
+	 *
+	 * @throws Error if the reverse direction for `direction` cannot be inferred
+	 *
+	 * @example
+	 * // Two-way link: moving NORTH from roomA goes to roomB, and moving SOUTH from roomB returns to roomA
+	 * const link = RoomLink.createTunnel(roomA, DIRECTION.NORTH, roomB);
+	 *
+	 * @example
+	 * // One-way link: moving EAST from roomA goes to roomB, but moving WEST from roomB does not return to roomA
+	 * const oneWay = RoomLink.createTunnel(roomA, DIRECTION.EAST, roomB, true);
+	 */
+	static createTunnel(
+		fromRoom: Room,
+		direction: DIRECTION,
+		toRoom: Room,
+		oneWay: boolean = false
+	) {
+		// infer the reverse direction automatically
+		const reverse = dir2reverse(direction);
+		if (reverse === undefined)
+			throw new Error("Unable to infer reverse direction for given direction");
+
+		const link = new RoomLink({
+			from: { room: fromRoom, direction },
+			to: { room: toRoom, direction: reverse },
+			oneWay,
+		});
+
+		// Register with the "from" room always
+		link._from.room.addLink(link);
+		// Register with the "to" room only for two-way links
+		if (!link._oneWay) link._to.room.addLink(link);
+		return link;
+	}
+
+	/**
+	 * Resolve the linked destination when moving from `fromRoom` in `direction`.
+	 *
+	 * The Room class calls this method while evaluating `getStep()` so it can
+	 * discover linked rooms that override spatial adjacency. The resolution
+	 * rules are straightforward:
+	 * - If `fromRoom` matches the link's `_from.room` and `direction` equals
+	 *   `_from.direction`, return `_to.room`.
+	 * - If the link is two-way and `fromRoom` matches `_to.room` with
+	 *   `direction === _to.direction`, return `_from.room`.
+	 * - Otherwise return `undefined` to indicate this link does not handle the
+	 *   requested traversal.
+	 *
+	 * This method does not perform permission checks (canEnter/canExit) — it
+	 * only resolves spatial/linked connectivity. Permission checks are done
+	 * by the calling code (e.g., Movable.canStep).
+	 *
+	 * @param fromRoom The room where traversal begins
+	 * @param direction The direction of traversal
+	 * @returns The destination `Room` if this link handles the traversal, otherwise `undefined`
+	 */
+	getDestination(fromRoom: Room, direction: DIRECTION): Room | undefined {
+		// Check from -> to
+		if (fromRoom === this._from.room && direction === this._from.direction) {
+			return this._to.room;
+		}
+		// Check to -> from (only if link is not one-way)
+		if (
+			!this._oneWay &&
+			fromRoom === this._to.room &&
+			direction === this._to.direction
+		) {
+			return this._from.room;
+		}
+		return undefined;
+	}
+
+	/**
+	 * Remove this link from both connected rooms.
+	 *
+	 * This method detaches the link from any room that currently has it. The
+	 * operation is idempotent and safe to call multiple times: `removeLink`
+	 * on the rooms will simply ignore links that are not present.
+	 *
+	 * After calling `remove()` there are no references to this link left in
+	 * the connected rooms' _links arrays, but the RoomLink object itself is
+	 * not modified further — callers may keep or discard the instance as they
+	 * wish.
+	 */
+	remove() {
+		this._from.room.removeLink(this);
+		this._to.room.removeLink(this);
 	}
 }

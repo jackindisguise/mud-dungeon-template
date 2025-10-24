@@ -2,163 +2,94 @@
 
 # MUD Dungeon System
 
-A 3D space management system for text-based games, providing room-based environments with object containment, keyword identification, and flexible movement mechanics.
+A 3D room/grid system for text-based games (MUDs). It provides room objects, containment hierarchies, movement primitives, and an extensible linking system that lets you override spatial relationships between rooms (including one-way portals).
 
-Particularly suited for MUD (Multi-User Dungeon) style games.
+## Directional movement
 
-## Core Features
+The system represents directions using bitwise flags which enables combining directions (e.g. north + east -> northeast).
 
-### Directional Movement
-The system uses a bitwise flag system for directions, enabling both simple and composite movements:
+- `DIRECTION` — enum of cardinal, vertical and composite directions.
+- `dir2text(dir)` — convert a DIRECTION to human-readable text.
+- `dir2reverse(dir)` — returns the opposite direction.
 
-```typescript
+### Examples
+
+```ts
 // Cardinal directions
-DIRECTION.NORTH
-DIRECTION.SOUTH
-DIRECTION.EAST
-DIRECTION.WEST
+DIRECTION.NORTH, DIRECTION.SOUTH, DIRECTION.EAST, DIRECTION.WEST
 
-// Vertical movement
-DIRECTION.UP
-DIRECTION.DOWN
+// Vertical
+DIRECTION.UP, DIRECTION.DOWN
 
-// Diagonal movement (predefined)
-DIRECTION.NORTHEAST
-DIRECTION.NORTHWEST
-DIRECTION.SOUTHEAST
-DIRECTION.SOUTHWEST
-
-// Create diagonal directions manually (same result)
-const diagonal = DIRECTION.NORTH | DIRECTION.EAST; // Same as DIRECTION.NORTHEAST
+// Combine flags for diagonals
+const diag = DIRECTION.NORTH | DIRECTION.EAST; // same as DIRECTION.NORTHEAST
 ```
 
-Direction utilities include:
-- Text representation (`DIR2TEXT`)
-- Opposite direction mapping (`DIR2REVERSE`)
-- Direction reversal function (`reverseDirection`)
+## Dungeon and Rooms
 
-### Space Management
+Use `Dungeon` to create a 3D grid of rooms. Rooms are addressed by `{x, y, z}` coordinates.
 
-#### Dungeon
-Central management class for the 3D game world:
-
-```typescript
-// Create a three-level dungeon
-const dungeon = new Dungeon({
-    dimensions: {
-        width: 10,   // East-West
-        height: 10,  // North-South
-        layers: 3    // Up-Down
-    }
-});
-
-// Find rooms
-const groundFloor = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-const secondFloor = dungeon.getRoom({ x: 0, y: 0, z: 1 });
-
-// Calculate adjacent rooms
-const nextRoom = dungeon.getStep({ x: 0, y: 0, z: 0 }, DIRECTION.NORTH);
-```
-
-Features:
-- Automatic room generation
-- Global object tracking
-- Room navigation and lookup
-- Multi-layer support
-- Boundary enforcement
-
-#### Room
-Represents individual locations within the dungeon:
-
-```typescript
-// Get room from dungeon
-const room = dungeon.getRoom({ x: 1, y: 1, z: 0 });
-
-// Check adjacent rooms
+```ts
+const dungeon = Dungeon.generateEmptyDungeon({ dimensions: { width: 10, height: 10, layers: 3 } });
+const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
 const northRoom = room.getStep(DIRECTION.NORTH);
-const diagonalRoom = room.getStep(DIRECTION.NORTHEAST);
-
-// Custom movement rules
-class LockedRoom extends Room {
-    canEnter(movable: Movable, direction?: DIRECTION) {
-        return movable.contents.some(item => item.match("key"));
-    }
-
-    onEnter(movable: Movable, direction?: DIRECTION) {
-        console.log("The door clicks shut behind you...");
-    }
-}
 ```
 
-Features:
-- Three-dimensional positioning
-- Adjacent room navigation
-- Movement validation hooks
-- Entry/exit event handlers
-- Customizable behavior
+Rooms are `DungeonObject`s and support containment, naming (keywords/display/description), and movement hooks:
 
-### Objects
-`DungeonObject` is the base class for all interactive elements:
+- `canEnter(movable, direction?)` — override to restrict entry
+- `canExit(movable, direction?)` — override to restrict exiting
+- `onEnter(movable, direction?)` / `onExit(movable, direction?)` — event hooks
 
-```typescript
-// Create items with keyword matching
-const sword = new DungeonObject({
-    keywords: "sword blade weapon",  // Space-delimited keywords
-	display: "a short sword"
-});
+## Objects and Movables
 
-const sheath = new DungeonObject({
-    keywords: "leather sheath scabbard",  // Simple word list
-	display: "a leather sheath"
-});
+`DungeonObject` is the base for represented items/containers. `Movable` extends it with movement helpers and coordinate caching.
 
-// Nested containments
-sheath.addObject(sword);
+### Examples
 
-// Find objects using natural language
-const weapon = sword.match("blad");  // Matches individual, partial words
-const container = sheath.match("leather sheath");     // Matches multiple keyword
-
-// Container queries
-const isInSheath = sheath.contains(sword);
-const parentContainer = sword.location;
+```ts
+const sword = new DungeonObject({ keywords: "sword blade", display: "a sword" });
+const player = new Movable();
+room.add(player);
+if (player.canStep(DIRECTION.NORTH)) player.step(DIRECTION.NORTH);
 ```
 
-Features:
-- Simple space-delimited keywords
-- Natural language matching
-- Nested object containment
-- Direct/indirect containment queries
-- Custom matching logic
+## Room links (portals/tunnels)
 
-### Movement
-`Movable` extends `DungeonObject` with navigation abilities:
+A construction pattern for non-Euclidean room links, plus support for one-way portals.
 
-Features:
-- Room-to-room navigation
-- Movement validation hooks
-- Event handling system
-- Location tracking
-- Custom movement rules
+- `RoomLink.createTunnel(fromRoom, direction, toRoom, oneWay = false)`
+  - Creates and registers a link.
+  - `direction` is the direction on `fromRoom` that leads to `toRoom`.
+  - If `oneWay` is true, the link will only be active from `fromRoom` -> `toRoom` (no return traversal).
+  - Otherwise, all tunnels are two-way.
+  - The `RoomLink` constructor is private — use the factory.
 
-## Installation
-Don't install this. It's meant to be imported and/or read.
+### Examples
 
-Dependencies:
-- [mud-ext](https://github.com/jackindisguise/mud-ext) - String matching utilities
-- TypeScript 5.5.0+ for development
+Two-way link (default):
 
-## Development
+```ts
+// moving NORTH from roomA will take you to roomB
+const link = RoomLink.createTunnel(roomA, DIRECTION.NORTH, roomB);
 
-```bash
-# Run tests
-npm test
-
-# Build TypeScript
-npm run build
-
-# Generate documentation
-npm run doc
+// now
+assert(roomA.getStep(DIRECTION.NORTH) === roomB);
+assert(roomB.getStep(DIRECTION.SOUTH) === roomA);
 ```
 
-## License
+One-way link:
+
+```ts
+// moving EAST from roomA goes to roomB, but moving WEST from roomB will NOT return to roomA
+const oneWay = RoomLink.createTunnel(roomA, DIRECTION.EAST, roomB, true);
+
+assert(roomA.getStep(DIRECTION.EAST) === roomB);
+assert.notStrictEqual(roomB.getStep(DIRECTION.WEST), roomA);
+```
+
+Notes & details
+
+- The factory infers the reverse direction using `dir2reverse(direction)`; if the reverse cannot be inferred an error is thrown. This protects against accidental mismatches.
+- The `RoomLink` instance exposes `getDestination(fromRoom, direction)` which is used by `Room.getStep()` when resolving linked rooms. Permission checks (canEnter/canExit) remain the responsibility of the caller (e.g., movement logic in `Movable`).
+- Calling `remove()` on a link detaches it from both rooms — the operation is idempotent.

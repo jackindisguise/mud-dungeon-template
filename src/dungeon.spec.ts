@@ -9,8 +9,11 @@ import {
 	DungeonObject,
 	Room,
 	Movable,
+	RoomLink,
 	Coordinates,
 } from "./dungeon.js";
+
+function xit(...args: any[]) {}
 
 describe("Direction System", () => {
 	it("should map directions to their text representations", () => {
@@ -275,6 +278,151 @@ describe("Room", () => {
 
 		assert(room.canEnter(movable));
 		assert(room.canExit(movable));
+	});
+});
+
+describe("RoomLink", () => {
+	it("should create bidirectional portals between rooms", () => {
+		const dungeon = Dungeon.generateEmptyDungeon({
+			dimensions: { width: 3, height: 3, layers: 1 },
+		});
+		const roomA = dungeon.getRoom({ x: 0, y: 0, z: 0 });
+		const roomB = dungeon.getRoom({ x: 2, y: 2, z: 0 });
+		assert(roomA && roomB);
+
+		const link = RoomLink.createTunnel(roomA, DIRECTION.NORTH, roomB);
+
+		// Test that moving NORTH from roomA leads to roomB
+		const northStep = roomA.getStep(DIRECTION.NORTH);
+		assert.strictEqual(northStep, roomB);
+
+		// Test that moving SOUTH from roomB leads back to roomA
+		const southStep = roomB.getStep(DIRECTION.SOUTH);
+		assert.strictEqual(southStep, roomA);
+
+		// Test that other directions are unaffected
+		assert.notStrictEqual(roomA.getStep(DIRECTION.EAST), roomB);
+		assert.notStrictEqual(roomB.getStep(DIRECTION.WEST), roomA);
+	});
+
+	it("should work with rooms in different dungeons", () => {
+		const dungeonA = Dungeon.generateEmptyDungeon({
+			dimensions: { width: 2, height: 2, layers: 1 },
+		});
+		const dungeonB = Dungeon.generateEmptyDungeon({
+			dimensions: { width: 2, height: 2, layers: 1 },
+		});
+
+		const roomA = dungeonA.getRoom({ x: 0, y: 0, z: 0 });
+		const roomB = dungeonB.getRoom({ x: 1, y: 1, z: 0 });
+		assert(roomA && roomB);
+
+		const link = RoomLink.createTunnel(roomA, DIRECTION.EAST, roomB);
+
+		// Test movement between dungeons
+		const player = new Movable();
+		roomA.add(player);
+
+		assert(player.canStep(DIRECTION.EAST));
+		player.step(DIRECTION.EAST);
+		assert(player.location === roomB);
+		assert(player.dungeon === dungeonB);
+
+		assert(player.canStep(DIRECTION.WEST));
+		player.step(DIRECTION.WEST);
+		assert(player.location === roomA);
+		assert(player.dungeon === dungeonA);
+	});
+
+	it("should allow removal of links", () => {
+		const dungeon = Dungeon.generateEmptyDungeon({
+			dimensions: { width: 3, height: 3, layers: 1 },
+		});
+		const roomA = dungeon.getRoom({ x: 0, y: 0, z: 0 });
+		const roomB = dungeon.getRoom({ x: 2, y: 2, z: 0 });
+		assert(roomA && roomB);
+
+		const link = RoomLink.createTunnel(roomA, DIRECTION.UP, roomB);
+
+		// Verify link works
+		assert.strictEqual(roomA.getStep(DIRECTION.UP), roomB);
+		assert.strictEqual(roomB.getStep(DIRECTION.DOWN), roomA);
+
+		// Remove link
+		link.remove();
+
+		// Verify normal spatial relationships are restored
+		assert.strictEqual(roomA.getStep(DIRECTION.UP), undefined);
+		assert.strictEqual(roomB.getStep(DIRECTION.DOWN), undefined);
+	});
+
+	it("should handle multiple links per room", () => {
+		const dungeon = Dungeon.generateEmptyDungeon({
+			dimensions: { width: 3, height: 3, layers: 1 },
+		});
+		const center = dungeon.getRoom({ x: 1, y: 1, z: 0 });
+		const north = dungeon.getRoom({ x: 1, y: 0, z: 0 });
+		const south = dungeon.getRoom({ x: 1, y: 2, z: 0 });
+		const east = dungeon.getRoom({ x: 2, y: 1, z: 0 });
+		assert(center && north && south && east);
+
+		// Create portal from center to each other room
+		const link1 = RoomLink.createTunnel(center, DIRECTION.UP, north);
+		const link2 = RoomLink.createTunnel(center, DIRECTION.DOWN, south);
+		const link3 = RoomLink.createTunnel(center, DIRECTION.WEST, east);
+
+		// Test all portals work
+		assert.strictEqual(center.getStep(DIRECTION.UP), north);
+		assert.strictEqual(center.getStep(DIRECTION.DOWN), south);
+		assert.strictEqual(center.getStep(DIRECTION.WEST), east);
+
+		// Test return trips
+		assert.strictEqual(north.getStep(DIRECTION.DOWN), center);
+		assert.strictEqual(south.getStep(DIRECTION.UP), center);
+		assert.strictEqual(east.getStep(DIRECTION.EAST), center);
+
+		// Remove middle link
+		link2.remove();
+
+		// Verify other links still work
+		assert.strictEqual(center.getStep(DIRECTION.UP), north);
+		assert.strictEqual(center.getStep(DIRECTION.WEST), east);
+		assert.strictEqual(north.getStep(DIRECTION.DOWN), center);
+		assert.strictEqual(east.getStep(DIRECTION.EAST), center);
+
+		// But removed link doesn't
+		assert.strictEqual(center.getStep(DIRECTION.DOWN), undefined);
+		assert.strictEqual(south.getStep(DIRECTION.UP), undefined);
+	});
+
+	it("should support one-way links", () => {
+		const dungeon = Dungeon.generateEmptyDungeon({
+			dimensions: { width: 3, height: 3, layers: 1 },
+		});
+		const roomA = dungeon.getRoom({ x: 0, y: 0, z: 0 });
+		const roomB = dungeon.getRoom({ x: 2, y: 2, z: 0 });
+		assert(roomA && roomB);
+
+		const link = RoomLink.createTunnel(roomA, DIRECTION.EAST, roomB, true);
+
+		// Forward direction should resolve
+		assert(roomA.getStep(DIRECTION.EAST) === roomB);
+		// Reverse direction should NOT resolve to the originating room
+		assert(roomB.getStep(DIRECTION.WEST) !== roomA);
+
+		// Movable can traverse forward across the one-way link
+		const player = new Movable();
+		roomA.add(player);
+		assert(player.canStep(DIRECTION.EAST));
+		player.step(DIRECTION.EAST);
+		assert.strictEqual(player.location, roomB);
+		// Attempting to go back should not land the player in roomA via the link
+		player.step(DIRECTION.WEST);
+		assert.notStrictEqual(player.location, roomA);
+
+		// Cleanup - removing the link must not point roomA->roomB anymore
+		link.remove();
+		assert.notStrictEqual(roomA.getStep(DIRECTION.EAST), roomB);
 	});
 });
 
