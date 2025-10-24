@@ -674,12 +674,33 @@ export class Dungeon {
  * });
  * ```
  */
-export type DungeonObjectOptions = {
+export interface DungeonObjectOptions {
 	keywords?: string;
 	display?: string;
 	description?: string;
 	dungeon?: Dungeon;
-};
+}
+
+/**
+ * Options for creating a `Room`.
+ *
+ * This type includes the required `coordinates` property and inherits the
+ * general `DungeonObjectOptions`.
+ *
+ * @property coordinates - The location of the room inside the dungeon grid.
+ *
+ * @example
+ * ```typescript
+ * const room = new Room({
+ *   coordinates: { x: 0, y: 0, z: 0 },
+ *   keywords: "start",
+ *   description: "The starting room of the dungeon."
+ * });
+ * ```
+ */
+export interface RoomOptions extends DungeonObjectOptions {
+	coordinates: Coordinates;
+}
 
 /**
  * Base class for all objects that can exist in the dungeon.
@@ -1083,32 +1104,6 @@ export type Coordinates = {
 	y: number;
 	z: number;
 };
-
-/**
- * Options for creating a `Room`.
- *
- * This type includes the required `coordinates` property and inherits the
- * general `DungeonObjectOptions` for metadata such as `keywords`, `display`,
- * `description`, and an optional `dungeon` reference.
- *
- * @property coordinates - The location of the room inside the dungeon grid.
- * @property keywords - Space-delimited keywords for identifying the room (from `DungeonObjectOptions`).
- * @property display - Short human-friendly name for the room (from `DungeonObjectOptions`).
- * @property description - Longer descriptive text (from `DungeonObjectOptions`).
- * @property dungeon - Optional `Dungeon` to automatically register the room with.
- *
- * @example
- * ```typescript
- * const room = new Room({
- *   coordinates: { x: 0, y: 0, z: 0 },
- *   keywords: "start",
- *   description: "The starting room of the dungeon."
- * });
- * ```
- */
-export type RoomOptions = {
-	coordinates: Coordinates;
-} & DungeonObjectOptions;
 
 /**
  * Represents a single location within the dungeon.
@@ -1653,6 +1648,15 @@ export class Movable extends DungeonObject {
 }
 
 /**
+ * Global registry of created RoomLink instances.
+ *
+ * This array is intentionally module-level so the application can iterate
+ * and persist links across dungeons. Links created by `RoomLink.createTunnel`
+ * are pushed here; `RoomLink.remove()` removes links from this array.
+ */
+export const ROOM_LINKS: RoomLink[] = [];
+
+/**
  * Represents a bidirectional portal between two rooms.
  * Links override normal spatial relationships to create connections
  * between any two rooms, regardless of their position in their respective dungeons.
@@ -1783,6 +1787,8 @@ export class RoomLink {
 		link._from.room.addLink(link);
 		// Register with the "to" room only for two-way links
 		if (!link._oneWay) link._to.room.addLink(link);
+		// Register in the global link registry for persistence/inspection
+		ROOM_LINKS.push(link);
 		return link;
 	}
 
@@ -1836,7 +1842,12 @@ export class RoomLink {
 	 * wish.
 	 */
 	remove() {
+		// Remove from connected rooms
 		this._from.room.removeLink(this);
 		this._to.room.removeLink(this);
+
+		// Remove from the global registry if present
+		const index = ROOM_LINKS.indexOf(this);
+		if (index !== -1) ROOM_LINKS.splice(index, 1);
 	}
 }
