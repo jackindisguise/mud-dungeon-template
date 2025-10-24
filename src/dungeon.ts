@@ -180,11 +180,11 @@ export function dir2text(dir: DIRECTION) {
  * };
  * ```
  */
-export type MapDimensions = {
+export interface MapDimensions {
 	width: number;
 	height: number;
 	layers: number;
-};
+}
 
 /**
  * Options for creating a `Dungeon` instance.
@@ -203,9 +203,9 @@ export type MapDimensions = {
  * const dungeon = new Dungeon(options);
  * ```
  */
-export type DungeonOptions = {
+export interface DungeonOptions {
 	dimensions: MapDimensions;
-};
+}
 
 /**
  * The main container class that manages a three-dimensional map..
@@ -685,7 +685,7 @@ export interface DungeonObjectOptions {
  * Options for creating a `Room`.
  *
  * This type includes the required `coordinates` property and inherits the
- * general `DungeonObjectOptions`.
+ * general `DungeonObjectOptions`gi.
  *
  * @property coordinates - The location of the room inside the dungeon grid.
  *
@@ -858,9 +858,7 @@ export class DungeonObject {
 	 * Assigning a new location will remove the object from its previous container
 	 * and add it to the new container. Setting to `undefined` removes it from any container.
 	 *
-	 * @param dobj The container to place this object into, or `undefined` to remove
-	 *
-	 * @example
+s	 * @example
 	 * ```typescript
 	 * const chest = new DungeonObject({ keywords: "wooden chest" });
 	 * const coin = new DungeonObject({ keywords: "gold coin" });
@@ -1099,11 +1097,11 @@ export class DungeonObject {
  * };
  * ```
  */
-export type Coordinates = {
+export interface Coordinates {
 	x: number;
 	y: number;
 	z: number;
-};
+}
 
 /**
  * Represents a single location within the dungeon.
