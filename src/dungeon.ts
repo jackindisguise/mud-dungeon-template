@@ -658,9 +658,9 @@ export class Dungeon {
  * These are helper parameters passed into `DungeonObject` and its subclasses
  * to set initial metadata and optionally register the object with a `Dungeon`.
  *
- * @property keywords - Space-delimited identification keywords (e.g. "small coin"). Defaults to "dungeon object" when not set.
- * @property display - Short, human-friendly name for the object (e.g. "Gold Coin"). Defaults to "Dungeon Object".
- * @property description - Longer descriptive text shown when examining the object. Defaults to "It's an object.".
+ * @property keywords - Space-delimited identification keywords (e.g. "small coin").
+ * @property display - Short, human-friendly name for the object (e.g. "Gold Coin").
+ * @property description - Longer descriptive text shown when examining the object.
  * @property dungeon - Optional `Dungeon` instance. When provided the object will be added to that dungeon's contents and inherit its dungeon reference.
  *
  * @example
