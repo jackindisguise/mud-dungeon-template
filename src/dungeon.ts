@@ -685,7 +685,7 @@ export interface DungeonObjectOptions {
  * Options for creating a `Room`.
  *
  * This type includes the required `coordinates` property and inherits the
- * general `DungeonObjectOptions`gi.
+ * general `DungeonObjectOptions`.
  *
  * @property coordinates - The location of the room inside the dungeon grid.
  *
@@ -767,7 +767,7 @@ export class DungeonObject {
 	 * Create a new DungeonObject.
 	 *
 	 * @param options Optional initialization values
-	 * @param options.keywords Space-delimited keywords used by `match()`
+	 * @param options.keywords Space-delimited keywords
 	 * @param options.display Human-readable display string
 	 * @param options.description Longer descriptive text
 	 * @param options.dungeon If provided, the object will be added to that dungeon
@@ -1204,9 +1204,8 @@ export class Room extends DungeonObject {
 	/**
 	 * Create a new Room instance.
 	 *
-	 * @param options Room initialization options (coordinates required)
+	 * @param options Room initialization options
 	 * @param options.coordinates The position of the room in the dungeon
-	 * @param options.dungeon Optional dungeon reference; if provided the room will be added
 	 *
 	 * @example
 	 * ```typescript
