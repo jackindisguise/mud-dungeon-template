@@ -50,8 +50,36 @@ Rooms are `DungeonObject`s and support containment, naming (keywords/display/des
 ```ts
 const sword = new DungeonObject({ keywords: "sword blade", display: "a sword" });
 const player = new Movable();
-room.add(player);
+player.add(sword); // sword added to player's inventory
+room.add(player); // player added to room
 if (player.canStep(DIRECTION.NORTH)) player.step(DIRECTION.NORTH);
+```
+
+## Location <-> Contents
+
+A `DungeonObject`'s location is always another `DungeonObject` or `undefined`. When it is another `DungeonObject`, there is a reciprocal relationship between `DungeonObject` `A` (the container) and `DungeonObject` `B` (the one contained). `A` must always have `B` in its `contents`, and `B` must always have its location set to `A`. If any one of these relationships changes, the other must change.
+
+```ts
+const A = new DungeonObject();
+const B = new DungeonObject();
+
+// changing location
+B.location = A;
+assert(A.contains(B)); // must be true
+assert(B.location === A); // must be true
+
+// adding to contents
+const C = new DungeonObject();
+C.add(B);
+assert(C.contains(B)); // must be true
+assert(B.location === C); // must be true
+assert(A.contains(B) === false); // must be false
+
+// using move()
+B.move(A);
+assert(A.contains(B)); // must be true
+assert(B.location === A); // must be true
+assert(C.contains(B) === false); // must be false
 ```
 
 ## Room links (portals/tunnels)
@@ -67,7 +95,7 @@ A construction pattern for non-Euclidean room links, plus support for one-way po
 
 ### Examples
 
-Two-way link (default):
+#### Two-way link (tunnel)
 
 ```ts
 // moving NORTH from roomA will take you to roomB
@@ -78,7 +106,7 @@ assert(roomA.getStep(DIRECTION.NORTH) === roomB);
 assert(roomB.getStep(DIRECTION.SOUTH) === roomA);
 ```
 
-One-way link:
+#### One-way link (portal)
 
 ```ts
 // moving EAST from roomA goes to roomB, but moving WEST from roomB will NOT return to roomA

@@ -1158,9 +1158,12 @@ export class Room extends DungeonObject {
 	/**
 	 * Links from this room to other rooms, overriding normal spatial relationships.
 	 * Links allow connections between any rooms regardless of their position.
+	 * This property is optional and is left undefined when the room has no links to
+	 * avoid allocating an array for every room in large dungeons where only a
+	 * small subset of rooms actually use links.
 	 * @private
 	 */
-	private _links: RoomLink[] = [];
+	private _links?: RoomLink[];
 
 	/**
 	 * Returns a shallow copy of the room's coordinates.
@@ -1230,9 +1233,8 @@ export class Room extends DungeonObject {
 	 * @internal
 	 */
 	addLink(link: RoomLink) {
-		if (!this._links.includes(link)) {
-			this._links.push(link);
-		}
+		if (!this._links) this._links = [];
+		if (!this._links.includes(link)) this._links.push(link);
 	}
 
 	/**
@@ -1243,10 +1245,13 @@ export class Room extends DungeonObject {
 	 * @internal
 	 */
 	removeLink(link: RoomLink) {
+		if (!this._links) return;
 		const index = this._links.indexOf(link);
 		if (index !== -1) {
 			this._links.splice(index, 1);
 		}
+		// If there are no more links, release the array to save memory
+		if (this._links.length === 0) this._links = undefined;
 	}
 
 	/**
@@ -1273,10 +1278,12 @@ export class Room extends DungeonObject {
 	 */
 	getStep(dir: DIRECTION) {
 		// First check for a linked room in this direction
-		for (const link of this._links) {
-			const destination = link.getDestination(this, dir);
-			if (destination) {
-				return destination;
+		if (this._links) {
+			for (const link of this._links) {
+				const destination = link.getDestination(this, dir);
+				if (destination) {
+					return destination;
+				}
 			}
 		}
 		// If no link handles this direction, use normal spatial navigation
@@ -1593,11 +1600,11 @@ export class Movable extends DungeonObject {
 	 * }
 	 * ```
 	 */
-	canStep(dir: DIRECTION) {
+	canStep(dir: DIRECTION): boolean {
 		const exit = this.getStep(dir);
 		if (!exit) return false;
 		if (!(this.location instanceof Room)) return false;
-		if (!this.location.canExit(this, dir)) return;
+		if (!this.location.canExit(this, dir)) return false;
 		if (!exit.canEnter(this, dir2reverse(dir))) return false;
 		return true;
 	}
@@ -1633,14 +1640,15 @@ export class Movable extends DungeonObject {
 	 * }
 	 * ```
 	 */
-	step(dir: DIRECTION) {
+	step(dir: DIRECTION): boolean {
 		if (!this.canStep(dir)) return false;
 		const exit = this.getStep(dir);
-		if (!exit) return;
+		if (!exit) return false;
 		if (this.location instanceof Room) this.location.onExit(this, dir);
 		this.move(exit);
 		if (this.location instanceof Room)
 			this.location.onEnter(this, dir2reverse(dir));
+		return true;
 	}
 }
 
