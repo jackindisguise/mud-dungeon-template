@@ -3,9 +3,8 @@ import { describe, it } from "node:test";
 
 import {
 	DIRECTION,
-	DIR2TEXT,
-	DIR2REVERSE,
-	reverseDirection,
+	dir2text,
+	dir2reverse,
 	Dungeon,
 	DungeonObject,
 	Room,
@@ -15,77 +14,53 @@ import {
 
 describe("Direction System", () => {
 	it("should map directions to their text representations", () => {
-		assert.strictEqual(DIR2TEXT.get(DIRECTION.NORTH), "north");
-		assert.strictEqual(DIR2TEXT.get(DIRECTION.SOUTH), "south");
-		assert.strictEqual(DIR2TEXT.get(DIRECTION.EAST), "east");
-		assert.strictEqual(DIR2TEXT.get(DIRECTION.WEST), "west");
-		assert.strictEqual(DIR2TEXT.get(DIRECTION.UP), "up");
-		assert.strictEqual(DIR2TEXT.get(DIRECTION.DOWN), "down");
-		assert.strictEqual(DIR2TEXT.get(DIRECTION.NORTHEAST), "northeast");
-		assert.strictEqual(DIR2TEXT.get(DIRECTION.NORTHWEST), "northwest");
-		assert.strictEqual(DIR2TEXT.get(DIRECTION.SOUTHEAST), "southeast");
-		assert.strictEqual(DIR2TEXT.get(DIRECTION.SOUTHWEST), "southwest");
+		assert.strictEqual(dir2text(DIRECTION.NORTH), "north");
+		assert.strictEqual(dir2text(DIRECTION.SOUTH), "south");
+		assert.strictEqual(dir2text(DIRECTION.EAST), "east");
+		assert.strictEqual(dir2text(DIRECTION.WEST), "west");
+		assert.strictEqual(dir2text(DIRECTION.UP), "up");
+		assert.strictEqual(dir2text(DIRECTION.DOWN), "down");
+		assert.strictEqual(dir2text(DIRECTION.NORTHEAST), "northeast");
+		assert.strictEqual(dir2text(DIRECTION.NORTHWEST), "northwest");
+		assert.strictEqual(dir2text(DIRECTION.SOUTHEAST), "southeast");
+		assert.strictEqual(dir2text(DIRECTION.SOUTHWEST), "southwest");
 	});
 
 	it("should correctly map directions to their opposites", () => {
-		assert.strictEqual(reverseDirection(DIRECTION.NORTH), DIRECTION.SOUTH);
-		assert.strictEqual(reverseDirection(DIRECTION.SOUTH), DIRECTION.NORTH);
-		assert.strictEqual(reverseDirection(DIRECTION.EAST), DIRECTION.WEST);
-		assert.strictEqual(reverseDirection(DIRECTION.WEST), DIRECTION.EAST);
-		assert.strictEqual(reverseDirection(DIRECTION.UP), DIRECTION.DOWN);
-		assert.strictEqual(reverseDirection(DIRECTION.DOWN), DIRECTION.UP);
-		assert.strictEqual(
-			reverseDirection(DIRECTION.NORTHEAST),
-			DIRECTION.SOUTHWEST
-		);
-		assert.strictEqual(
-			reverseDirection(DIRECTION.NORTHWEST),
-			DIRECTION.SOUTHEAST
-		);
-		assert.strictEqual(
-			reverseDirection(DIRECTION.SOUTHEAST),
-			DIRECTION.NORTHWEST
-		);
-		assert.strictEqual(
-			reverseDirection(DIRECTION.SOUTHWEST),
-			DIRECTION.NORTHEAST
-		);
+		assert.strictEqual(dir2reverse(DIRECTION.NORTH), DIRECTION.SOUTH);
+		assert.strictEqual(dir2reverse(DIRECTION.SOUTH), DIRECTION.NORTH);
+		assert.strictEqual(dir2reverse(DIRECTION.EAST), DIRECTION.WEST);
+		assert.strictEqual(dir2reverse(DIRECTION.WEST), DIRECTION.EAST);
+		assert.strictEqual(dir2reverse(DIRECTION.UP), DIRECTION.DOWN);
+		assert.strictEqual(dir2reverse(DIRECTION.DOWN), DIRECTION.UP);
+		assert.strictEqual(dir2reverse(DIRECTION.NORTHEAST), DIRECTION.SOUTHWEST);
+		assert.strictEqual(dir2reverse(DIRECTION.NORTHWEST), DIRECTION.SOUTHEAST);
+		assert.strictEqual(dir2reverse(DIRECTION.SOUTHEAST), DIRECTION.NORTHWEST);
+		assert.strictEqual(dir2reverse(DIRECTION.SOUTHWEST), DIRECTION.NORTHEAST);
 	});
 
 	it("should treat combined directions same as predefined combinations", () => {
 		// Text representations
-		assert.strictEqual(
-			DIR2TEXT.get(DIRECTION.NORTH | DIRECTION.EAST),
-			"northeast"
-		);
-		assert.strictEqual(
-			DIR2TEXT.get(DIRECTION.NORTH | DIRECTION.WEST),
-			"northwest"
-		);
-		assert.strictEqual(
-			DIR2TEXT.get(DIRECTION.SOUTH | DIRECTION.EAST),
-			"southeast"
-		);
-		assert.strictEqual(
-			DIR2TEXT.get(DIRECTION.SOUTH | DIRECTION.WEST),
-			"southwest"
-		);
+		assert.strictEqual(dir2text(DIRECTION.NORTH | DIRECTION.EAST), "northeast");
+		assert.strictEqual(dir2text(DIRECTION.NORTH | DIRECTION.WEST), "northwest");
+		assert.strictEqual(dir2text(DIRECTION.SOUTH | DIRECTION.EAST), "southeast");
+		assert.strictEqual(dir2text(DIRECTION.SOUTH | DIRECTION.WEST), "southwest");
 
 		// Direction reversal
 		assert.strictEqual(
-			reverseDirection(DIRECTION.NORTH | DIRECTION.EAST),
+			dir2reverse(DIRECTION.NORTH | DIRECTION.EAST),
 			DIRECTION.SOUTHWEST
 		);
 		assert.strictEqual(
-			reverseDirection(DIRECTION.NORTH | DIRECTION.WEST),
+			dir2reverse(DIRECTION.NORTH | DIRECTION.WEST),
 			DIRECTION.SOUTHEAST
 		);
 		assert.strictEqual(
-			reverseDirection(DIRECTION.SOUTH | DIRECTION.EAST),
+			dir2reverse(DIRECTION.SOUTH | DIRECTION.EAST),
 			DIRECTION.NORTHWEST
 		);
 		assert.strictEqual(
-			reverseDirection(DIRECTION.SOUTH | DIRECTION.WEST),
+			dir2reverse(DIRECTION.SOUTH | DIRECTION.WEST),
 			DIRECTION.NORTHEAST
 		);
 
@@ -122,7 +97,7 @@ describe("DungeonObject", () => {
 	});
 
 	it("should handle dungeon assignment and removal", () => {
-		const dungeon = new Dungeon({
+		const dungeon = Dungeon.generateEmptyDungeon({
 			dimensions: { width: 5, height: 5, layers: 1 },
 		});
 		const obj = new DungeonObject();
@@ -140,7 +115,7 @@ describe("DungeonObject", () => {
 describe("Dungeon", () => {
 	it("should generate rooms correctly", () => {
 		const dimensions = { width: 3, height: 2, layers: 2 };
-		const dungeon = new Dungeon({ dimensions });
+		const dungeon = Dungeon.generateEmptyDungeon({ dimensions });
 
 		for (let z = 0; z < dimensions.layers; z++) {
 			for (let y = 0; y < dimensions.height; y++) {
@@ -153,8 +128,24 @@ describe("Dungeon", () => {
 		}
 	});
 
-	it("should handle room boundaries correctly", () => {
-		const dungeon = new Dungeon({
+	it("should support both object and individual coordinate parameters", () => {
+		const dungeon = Dungeon.generateEmptyDungeon({
+			dimensions: { width: 3, height: 3, layers: 2 },
+		});
+
+		// Test both signatures return the same room
+		const roomObj = dungeon.getRoom({ x: 1, y: 1, z: 0 });
+		const roomCoords = dungeon.getRoom(1, 1, 0);
+		assert.strictEqual(roomObj, roomCoords);
+		assert(roomObj instanceof Room);
+
+		// Test coordinates match for both signatures
+		assert.deepStrictEqual(roomObj?.coordinates, { x: 1, y: 1, z: 0 });
+		assert.deepStrictEqual(roomCoords?.coordinates, { x: 1, y: 1, z: 0 });
+	});
+
+	it("should handle room boundaries correctly using object coordinates", () => {
+		const dungeon = Dungeon.generateEmptyDungeon({
 			dimensions: { width: 2, height: 2, layers: 2 },
 		});
 
@@ -166,8 +157,43 @@ describe("Dungeon", () => {
 		assert.strictEqual(dungeon.getRoom({ x: 0, y: 0, z: 2 }), undefined);
 	});
 
+	it("should handle room boundaries correctly using individual coordinates", () => {
+		const dungeon = Dungeon.generateEmptyDungeon({
+			dimensions: { width: 2, height: 2, layers: 2 },
+		});
+
+		assert.strictEqual(dungeon.getRoom(-1, 0, 0), undefined);
+		assert.strictEqual(dungeon.getRoom(2, 0, 0), undefined);
+		assert.strictEqual(dungeon.getRoom(0, -1, 0), undefined);
+		assert.strictEqual(dungeon.getRoom(0, 2, 0), undefined);
+		assert.strictEqual(dungeon.getRoom(0, 0, -1), undefined);
+		assert.strictEqual(dungeon.getRoom(0, 0, 2), undefined);
+	});
+
+	it("should return consistent results for edge cases in both signatures", () => {
+		const dungeon = Dungeon.generateEmptyDungeon({
+			dimensions: { width: 2, height: 2, layers: 2 },
+		});
+
+		// Test corner coordinates with both signatures
+		const cornerObj = dungeon.getRoom({ x: 1, y: 1, z: 1 });
+		const cornerCoords = dungeon.getRoom(1, 1, 1);
+		assert.strictEqual(cornerObj, cornerCoords);
+		assert(cornerObj instanceof Room);
+
+		// Test origin coordinates (0,0,0) with both signatures
+		const originObj = dungeon.getRoom({ x: 0, y: 0, z: 0 });
+		const originCoords = dungeon.getRoom(0, 0, 0);
+		assert.strictEqual(originObj, originCoords);
+		assert(originObj instanceof Room);
+
+		// Test that both signatures return undefined for the same out-of-bounds coordinates
+		assert.strictEqual(dungeon.getRoom({ x: 2, y: 2, z: 2 }), undefined);
+		assert.strictEqual(dungeon.getRoom(2, 2, 2), undefined);
+	});
+
 	it("should calculate steps in all directions correctly", () => {
-		const dungeon = new Dungeon({
+		const dungeon = Dungeon.generateEmptyDungeon({
 			dimensions: { width: 3, height: 3, layers: 3 },
 		});
 		const center = dungeon.getRoom({ x: 1, y: 1, z: 1 });
@@ -184,6 +210,51 @@ describe("Dungeon", () => {
 
 		const up = dungeon.getStep({ x: 1, y: 1, z: 1 }, DIRECTION.UP);
 		assert.deepStrictEqual(up?.coordinates, { x: 1, y: 1, z: 2 });
+	});
+});
+
+describe("Dungeon room creation helpers", () => {
+	it("createRoom() should create a room and place it in the grid", () => {
+		const dungeon = new Dungeon({
+			dimensions: { width: 2, height: 2, layers: 1 },
+		});
+		const room = dungeon.createRoom({
+			coordinates: { x: 0, y: 1, z: 0 },
+		});
+		assert(room instanceof Room);
+		// The created room should be retrievable from the dungeon
+		assert.strictEqual(dungeon.getRoom(0, 1, 0), room);
+		// And the room should know its dungeon
+		assert.strictEqual(room.dungeon, dungeon);
+	});
+
+	it("addRoom() should add an external Room instance and return true/false for invalid coords", () => {
+		const dungeon = new Dungeon({
+			dimensions: { width: 2, height: 2, layers: 1 },
+		});
+
+		// Create a room externally and add it
+		const external = new Room({ coordinates: { x: 1, y: 0, z: 0 } });
+		const added = dungeon.addRoom(external);
+		assert.strictEqual(added, true);
+		assert.strictEqual(dungeon.getRoom(1, 0, 0), external);
+		assert.strictEqual(external.dungeon, dungeon);
+
+		// Out-of-bounds room should not be added
+		const bad = new Room({ coordinates: { x: 99, y: 0, z: 0 } });
+		const addedBad = dungeon.addRoom(bad);
+		assert.strictEqual(addedBad, false);
+		// And dungeon should not reference it
+		assert.strictEqual(dungeon.getRoom(99, 0, 0), undefined);
+		assert.strictEqual(bad.dungeon, undefined);
+	});
+
+	it("createRoom() should return undefined for out-of-bounds coordinates", () => {
+		const dungeon = new Dungeon({
+			dimensions: { width: 2, height: 2, layers: 1 },
+		});
+		const r = dungeon.createRoom({ coordinates: { x: 2, y: 0, z: 0 } });
+		assert.strictEqual(r, undefined);
 	});
 });
 
@@ -209,9 +280,10 @@ describe("Room", () => {
 
 describe("Movable", () => {
 	it("should cache and clear coordinates when moving between rooms", () => {
-		const dungeon = new Dungeon({
+		const dungeon = Dungeon.generateEmptyDungeon({
 			dimensions: { width: 3, height: 3, layers: 1 },
 		});
+		dungeon.generateRooms();
 		const movable = new Movable();
 		const room1 = dungeon.getRoom({ x: 0, y: 0, z: 0 });
 		const room2 = dungeon.getRoom({ x: 1, y: 0, z: 0 });
@@ -228,7 +300,7 @@ describe("Movable", () => {
 	});
 
 	it("should handle movement between rooms correctly", () => {
-		const dungeon = new Dungeon({
+		const dungeon = Dungeon.generateEmptyDungeon({
 			dimensions: { width: 3, height: 3, layers: 1 },
 		});
 		const movable = new Movable();
@@ -244,7 +316,7 @@ describe("Movable", () => {
 	});
 
 	it("should not allow movement outside dungeon boundaries", () => {
-		const dungeon = new Dungeon({
+		const dungeon = Dungeon.generateEmptyDungeon({
 			dimensions: { width: 3, height: 3, layers: 1 },
 		});
 		const movable = new Movable();
@@ -259,7 +331,7 @@ describe("Movable", () => {
 	});
 
 	it("should handle movement in all directions correctly", () => {
-		const dungeon = new Dungeon({
+		const dungeon = Dungeon.generateEmptyDungeon({
 			dimensions: { width: 3, height: 3, layers: 3 },
 		});
 		const movable = new Movable();
@@ -359,7 +431,7 @@ describe("Movable", () => {
 	});
 
 	it("should handle movement with combined directions", () => {
-		const dungeon = new Dungeon({
+		const dungeon = Dungeon.generateEmptyDungeon({
 			dimensions: { width: 3, height: 3, layers: 3 },
 		});
 		const movable = new Movable();

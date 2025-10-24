@@ -55,7 +55,7 @@ export enum DIRECTION {
  * room.onEnter(player, DIR2REVERSE.get(exitDirection)); // Get entry direction from exit
  * ```
  */
-export const DIR2REVERSE = new Map<DIRECTION, DIRECTION>([
+const DIR2REVERSE = new Map<DIRECTION, DIRECTION>([
 	[DIRECTION.NORTH, DIRECTION.SOUTH],
 	[DIRECTION.SOUTH, DIRECTION.NORTH],
 	[DIRECTION.EAST, DIRECTION.WEST],
@@ -82,23 +82,23 @@ export const DIR2REVERSE = new Map<DIRECTION, DIRECTION>([
  * @example
  * ```typescript
  * // Basic direction reversal
- * const south = reverseDirection(DIRECTION.NORTH); // Returns DIRECTION.SOUTH
- * const up = reverseDirection(DIRECTION.DOWN); // Returns DIRECTION.UP
+ * const south = dir2reverse(DIRECTION.NORTH); // Returns DIRECTION.SOUTH
+ * const up = dir2reverse(DIRECTION.DOWN); // Returns DIRECTION.UP
  *
  * // Diagonal direction reversal
- * const southwest = reverseDirection(DIRECTION.NORTHEAST); // Returns DIRECTION.SOUTHWEST
+ * const southwest = dir2reverse(DIRECTION.NORTHEAST); // Returns DIRECTION.SOUTHWEST
  *
  * // Using with room movement
  * if (room.canExit(player, DIRECTION.NORTH)) {
  *   const nextRoom = room.getStep(DIRECTION.NORTH);
  *   // Check if we can enter from the opposite direction
- *   if (nextRoom.canEnter(player, reverseDirection(DIRECTION.NORTH))) {
+ *   if (nextRoom.canEnter(player, dir2reverse(DIRECTION.NORTH))) {
  *     player.step(DIRECTION.NORTH);
  *   }
  * }
  * ```
  */
-export function reverseDirection(dir: DIRECTION) {
+export function dir2reverse(dir: DIRECTION) {
 	return DIR2REVERSE.get(dir);
 }
 
@@ -129,7 +129,7 @@ export function reverseDirection(dir: DIRECTION) {
  * }
  * ```
  */
-export const DIR2TEXT = new Map<DIRECTION, string>([
+const DIR2TEXT = new Map<DIRECTION, string>([
 	[DIRECTION.NORTH, "north"],
 	[DIRECTION.SOUTH, "south"],
 	[DIRECTION.EAST, "east"],
@@ -145,6 +145,23 @@ export const DIR2TEXT = new Map<DIRECTION, string>([
 	[DIRECTION.SOUTHEAST, "southeast"],
 	[DIRECTION.SOUTHWEST, "southwest"],
 ]);
+
+/**
+ * Convert a DIRECTION flag into its user-facing text representation.
+ * Handles both cardinal and composite (diagonal) directions.
+ *
+ * @param dir The direction flag or combination of flags to convert
+ * @returns The textual representation (e.g. "north", "northeast") or `undefined` if unknown
+ *
+ * @example
+ * ```typescript
+ * console.log(dir2text(DIRECTION.NORTH)); // "north"
+ * console.log(dir2text(DIRECTION.NORTHEAST)); // "northeast"
+ * ```
+ */
+export function dir2text(dir: DIRECTION) {
+	return DIR2TEXT.get(dir);
+}
 
 /**
  * Defines the dimensions of a dungeon's room grid.
@@ -172,7 +189,7 @@ export type MapDimensions = {
 /**
  * Configuration options for creating a new Dungeon instance.
  * Currently only contains dimensions, but designed to be extensible for future options.
- *s
+ *
  * @property dimensions - The size of the dungeon in all three dimensions
  *
  * @example
@@ -184,6 +201,7 @@ export type MapDimensions = {
  *     layers: 3
  *   }
  * };
+ *
  * const dungeon = new Dungeon(options);
  * ```
  */
@@ -198,7 +216,7 @@ export type DungeonOptions = {
  * @example
  * ```typescript
  * // Create a new dungeon with specific dimensions
- * const dungeon = new Dungeon({
+ * const dungeon = Dungeon.generateEmptyDungeon({
  *   dimensions: { width: 10, height: 10, layers: 3 }
  * });
  *
@@ -218,17 +236,54 @@ export type DungeonOptions = {
  * console.log(dungeon.contains(object) === true)
  * console.log(dungeon.contains(object2) === true)
  * ```
- *
- * The Dungeon class handles:
- * - Room generation and management
- * - Object containment and tracking
- * - Room navigation and movement
- * - Multi-layer support
  */
 export class Dungeon {
-	private _rooms: Room[][][] = [];
+	/**
+	 * Three-dimensional array of rooms that makes up the dungeon grid.
+	 * Indexed as [z][y][x] for vertical layers, rows, and columns respectively.
+	 * Can be undefined before grid initialization or contain undefined slots
+	 * for ungenerated rooms.
+	 */
+	private _rooms?: (Room | undefined)[][][];
+
+	/**
+	 * Registry of all objects that exist in this dungeon, regardless of their
+	 * containment relationships. This includes rooms, items, creatures, and any
+	 * other objects that are part of the dungeon hierarchy.
+	 */
 	private _contents: DungeonObject[] = [];
+
+	/**
+	 * The size of the dungeon in all three dimensions. Used for bounds checking
+	 * and room generation. These dimensions are immutable after creation.
+	 */
 	private _dimensions: MapDimensions;
+
+	/**
+	 * Creates a new dungeon and populates it with empty rooms.
+	 * This is a convenience method that creates a dungeon instance and
+	 * immediately calls generateRooms() to fill it with Room objects.
+	 *
+	 * @param options Configuration options for the dungeon
+	 * @returns A new Dungeon instance with all rooms initialized
+	 *
+	 * @example
+	 * ```typescript
+	 * // Create a fully populated 5x5x2 dungeon
+	 * const dungeon = Dungeon.generateEmptyDungeon({
+	 *   dimensions: { width: 5, height: 5, layers: 2 }
+	 * });
+	 *
+	 * // All rooms are already created and accessible
+	 * const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
+	 * console.log(room instanceof Room); // true
+	 * ```
+	 */
+	static generateEmptyDungeon(options: DungeonOptions) {
+		const dungeon = new Dungeon(options);
+		dungeon.generateRooms();
+		return dungeon;
+	}
 
 	/**
 	 * Create a new Dungeon instance.
@@ -244,7 +299,7 @@ export class Dungeon {
 	 */
 	constructor(options: DungeonOptions) {
 		this._dimensions = options.dimensions;
-		this.generateRooms(options.dimensions);
+		this.generateGrid();
 	}
 
 	/**
@@ -257,7 +312,7 @@ export class Dungeon {
 	 * @example
 	 * ```typescript
 	 * // Create a dungeon with some objects
-	 * const dungeon = new Dungeon({ dimensions: { width: 10, height: 10, layers: 1 } });
+	 * const dungeon = Dungeon.generateEmptyDungeon({ dimensions: { width: 10, height: 10, layers: 1 } });
 	 * const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
 	 * const player = new Movable();
 	 * const sword = new DungeonObject();
@@ -278,10 +333,26 @@ export class Dungeon {
 	}
 
 	/**
-	 * Add objects to our contents.
-	 * Recursively set the object's dungeon.
-	 * @param dobjs
-	 * @returns
+	 * Add objects to this dungeon's registry of all contained objects.
+	 * Also sets the object's dungeon reference to this dungeon.
+	 *
+	 * @param dobjs The objects to add to this dungeon
+	 *
+	 * @example
+	 * ```typescript
+	 * const dungeon = Dungeon.generateEmptyDungeon({ dimensions: { width: 5, height: 5, layers: 1 } });
+	 * const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
+	 * const chest = new DungeonObject();
+	 * const coin = new DungeonObject();
+	 *
+	 * // Add multiple objects at once
+	 * dungeon.add(chest, coin);
+	 * console.log(dungeon.contains(chest)); // true
+	 * console.log(dungeon.contains(coin)); // true
+	 *
+	 * // Objects know their dungeon
+	 * console.log(chest.dungeon === dungeon); // true
+	 * ```
 	 */
 	add(...dobjs: DungeonObject[]) {
 		for (let obj of dobjs) {
@@ -292,9 +363,25 @@ export class Dungeon {
 	}
 
 	/**
-	 * Remove objects from our contents.
-	 * Recursively unset the object's dungeons.
-	 * @param dobjs
+	 * Remove objects from this dungeon's registry of contained objects.
+	 * Also unsets the object's dungeon reference if it points to this dungeon.
+	 *
+	 * @param dobjs The objects to remove from this dungeon
+	 *
+	 * @example
+	 * ```typescript
+	 * const dungeon = Dungeon.generateEmptyDungeon({ dimensions: { width: 5, height: 5, layers: 1 } });
+	 * const chest = new DungeonObject();
+	 *
+	 * // Add and then remove an object
+	 * dungeon.add(chest);
+	 * console.log(dungeon.contains(chest)); // true
+	 * console.log(chest.dungeon === dungeon); // true
+	 *
+	 * dungeon.remove(chest);
+	 * console.log(dungeon.contains(chest)); // false
+	 * console.log(chest.dungeon === dungeon); // false
+	 * ```
 	 */
 	remove(...dobjs: DungeonObject[]) {
 		for (let obj of dobjs) {
@@ -305,23 +392,63 @@ export class Dungeon {
 		}
 	}
 
+	/**
+	 * Check whether this dungeon contains the given object.
+	 *
+	 * @param dobj The object to test for membership in this dungeon
+	 * @returns true if the object is registered in this dungeon's contents
+	 *
+	 * @example
+	 * ```typescript
+	 * const dungeon = Dungeon.generateEmptyDungeon({ dimensions: { width: 3, height: 3, layers: 1 } });
+	 * const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
+	 * const chest = new DungeonObject({ keywords: "chest" });
+	 * const coin = new DungeonObject({ keywords: "coin" });
+	 *
+	 * // Place chest in room (chest and room are added to dungeon.contents)
+	 * room.add(chest);
+	 * console.log(dungeon.contains(chest)); // true
+	 *
+	 * // Put coin in the chest (coin is also added to dungeon.contents via location updates)
+	 * chest.add(coin);
+	 * console.log(dungeon.contains(coin)); // true
+	 *
+	 * // Note: contains() only checks registered top-level membership
+	 * // To verify 'coin' is inside 'chest', check chest.contains(coin)
+	 * console.log(chest.contains(coin)); // true
+	 * ```
+	 */
 	contains(dobj: DungeonObject) {
 		return this._contents.indexOf(dobj) !== -1;
 	}
 
 	/**
-	 * Generate a 3-dimensional grid of rooms.
-	 * @param dimensions
+	 * Initialize the internal 3D room grid structure.
+	 *
+	 * This creates a three-dimensional array sized according to `dimensions` and
+	 * fills it with `undefined` placeholders. It does not allocate `Room`
+	 * instances — that work is performed by `generateEmptyRooms()` (or you can
+	 * allocate rooms yourself and assign them into the grid). Splitting
+	 * allocation from instantiation allows faster, low-cost grid setup in cases
+	 * where rooms are created lazily or populated from external data.
+
+	 * @param dimensions The size of the grid to create (width, height, layers)
+	 * @example
+	 * ```typescript
+	 * // Create an internal grid sized 10x10x2 but don't instantiate Room objects yet
+	 * const dungeon = new Dungeon({ dimensions: { width: 10, height: 10, layers: 2 } });
+	 * // The constructor calls generateGrid automatically; the grid currently holds undefined values
+	 * console.log(dungeon.getRoom({ x: 0, y: 0, z: 0 })); // undefined until generateEmptyRooms() runs
+	 * ```
 	 */
-	generateRooms(dimensions: MapDimensions) {
-		const rooms: Room[][][] = [];
-		for (let z = 0; z < dimensions.layers; z++) {
-			const layer: Room[][] = [];
-			for (let y = 0; y < dimensions.height; y++) {
-				const row: Room[] = [];
-				for (let x = 0; x < dimensions.width; x++) {
-					const room = new Room({ dungeon: this, coordinates: { x, y, z } });
-					row.push(room);
+	private generateGrid() {
+		const rooms: (Room | undefined)[][][] = [];
+		for (let z = 0; z < this._dimensions.layers; z++) {
+			const layer: (Room | undefined)[][] = [];
+			for (let y = 0; y < this._dimensions.height; y++) {
+				const row: (Room | undefined)[] = [];
+				for (let x = 0; x < this._dimensions.width; x++) {
+					row.push(undefined);
 				}
 				layer.push(row);
 			}
@@ -331,31 +458,189 @@ export class Dungeon {
 	}
 
 	/**
+	 * Instantiate `Room` objects for every slot in the internal grid.
+	 *
+	 * This walks the `_rooms` 3D array created by `generateGrid()` and replaces
+	 * `undefined` placeholders with actual `Room` instances that are linked back
+	 * to this dungeon. If the internal grid is not present, the method is a
+	 * no-op. Use this to eagerly allocate every room in the dungeon.
+	 *
+	 * @example
+	 * ```typescript
+	 * // After generateGrid (done in constructor) the grid is empty; populate it now
+	 * dungeon.generateRooms();
+	 * const start = dungeon.getRoom({ x: 0, y: 0, z: 0 });
+	 * console.log(start instanceof Room); // true
+	 * ```
+	 */
+	generateRooms() {
+		if (!this._rooms) return;
+		for (let z = 0; z < this._dimensions.layers; z++)
+			for (let y = 0; y < this._dimensions.height; y++)
+				for (let x = 0; x < this._dimensions.width; x++)
+					this.createRoom({ coordinates: { x, y, z } });
+	}
+
+	/**
+	 * Adds an existing Room instance to the dungeon's room grid at the room's coordinates.
+	 * The room must have valid coordinates that are within the dungeon's dimensions.
+	 * If a room already exists at those coordinates, it will be replaced.
+	 *
+	 * Note: This method allows direct modification of the dungeon's room grid.
+	 * Use with caution as it can create inconsistencies if not used properly.
+	 *
+	 * @param room The Room instance to add to the dungeon
+	 * @returns true if the room was added to the dungeon
+	 *
+	 * @example
+	 * ```typescript
+	 * const room = new Room({ coordinates: { x: 0, y: 0, z: 0 } });
+	 * const added = dungeon.addRoom(room);
+	 * if (added) {
+	 *   console.log('Room added successfully');
+	 * }
+	 * ```
+	 */
+	addRoom(room: Room): boolean {
+		const { x, y, z } = room.coordinates;
+
+		// Check if coordinates are within bounds
+		if (
+			x < 0 ||
+			x >= this._dimensions.width ||
+			y < 0 ||
+			y >= this._dimensions.height ||
+			z < 0 ||
+			z >= this._dimensions.layers
+		)
+			return false;
+
+		// Ensure the room grid exists
+		if (!this._rooms) return false;
+
+		this._rooms[z][y][x] = room;
+		room.dungeon = this;
+		return true;
+	}
+
+	/**
+	 * Creates a new Room with the given options and adds it to the dungeon.
+	 * The room will be placed in the dungeon's room grid according to its coordinates.
+	 *
+	 * @param options The options for creating the room, must include coordinates
+	 * @returns The created room if successful, undefined if the coordinates are invalid
+	 *
+	 * @example
+	 * ```typescript
+	 * const room = dungeon.createRoom({
+	 *   coordinates: { x: 0, y: 0, z: 0 },
+	 *   keywords: "start room",
+	 *   description: "You are in the starting room."
+	 * });
+	 *
+	 * if (room) console.log('Room created and added successfully');
+	 * ```
+	 */
+	createRoom(options: RoomOptions): Room | undefined {
+		const room = new Room({ ...options, dungeon: this });
+		if (this.addRoom(room)) return room;
+	}
+
+	/**
 	 * Get the room at the specified coordinates.
 	 * Returns undefined when the coordinates are outside the dungeon bounds.
 	 *
-	 * @param coordinates The x/y/z coordinates to look up
+	 * @param coordinates The coordinates object containing x/y/z positions
 	 * @returns The Room at the coordinates or undefined if out of bounds
 	 *
 	 * @example
 	 * ```typescript
-	 * const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
-	 * if (!room) throw new Error('No room at those coordinates');
+	 * // Using a coordinates object
+	 * const room1 = dungeon.getRoom({ x: 0, y: 0, z: 0 });
+	 * if (!room1) throw new Error('No room at those coordinates');
 	 * ```
 	 */
-	getRoom(coordinates: Coordinates) {
-		if (coordinates.x < 0 || coordinates.x >= this._dimensions.width) return;
-		if (coordinates.y < 0 || coordinates.y >= this._dimensions.height) return;
-		if (coordinates.z < 0 || coordinates.z >= this._dimensions.layers) return;
-		return this._rooms[coordinates.z][coordinates.y][coordinates.x];
+	getRoom(coordinates: Coordinates): Room | undefined;
+
+	/**
+	 * Get the room at the specified coordinates.
+	 * Returns undefined when the coordinates are outside the dungeon bounds.
+	 *
+	 * @param x The x-coordinate of the room
+	 * @param y The y-coordinate of the room
+	 * @param z The z-coordinate of the room
+	 * @returns The Room at the coordinates or undefined if out of bounds
+	 *
+	 * @example
+	 * ```typescript
+	 * // Using xyz coordinates
+	 * const room1 = dungeon.getRoom(0, 0, 0);
+	 * if (!room1) throw new Error('No room at those coordinates');
+	 * ```
+
+	 * @param x 
+	 * @param y 
+	 * @param z 
+	 */
+	getRoom(x: number, y: number, z: number): Room | undefined;
+	getRoom(
+		coordsOrX: Coordinates | number,
+		y?: number,
+		z?: number
+	): Room | undefined {
+		let coords: Coordinates;
+
+		if (
+			typeof coordsOrX === "number" &&
+			typeof y === "number" &&
+			typeof z === "number"
+		) {
+			coords = { x: coordsOrX, y, z };
+		} else if (typeof coordsOrX === "object") {
+			coords = coordsOrX;
+		} else {
+			return undefined;
+		}
+
+		if (!this._rooms) return;
+		if (coords.x < 0 || coords.x >= this._dimensions.width) return;
+		if (coords.y < 0 || coords.y >= this._dimensions.height) return;
+		if (coords.z < 0 || coords.z >= this._dimensions.layers) return;
+		return this._rooms[coords.z][coords.y][coords.x];
 	}
 
 	/**
-	 * Gets the room in the given direction from the given coordinate.
-	 * Also accepts a room as the coordinate.
-	 * @param coordinates
-	 * @param direction
-	 * @returns
+	 * Gets the room adjacent to a given position in the specified direction.
+	 * This method handles both cardinal and diagonal movement by using bitwise
+	 * direction flags. The input coordinates can be either explicit coordinates
+	 * or a Room instance (in which case its coordinates are used).
+	 *
+	 * @param coordinates Starting position as either Coordinates or a Room instance
+	 * @param direction The direction to move, can be a single direction or combination
+	 * @returns The Room in the specified direction, or undefined if out of bounds
+	 *
+	 * @example
+	 * ```typescript
+	 * const dungeon = Dungeon.generateEmptyDungeon({
+	 *   dimensions: { width: 3, height: 3, layers: 2 }
+	 * });
+	 * const start = dungeon.getRoom({ x: 1, y: 1, z: 0 });
+	 *
+	 * // Using explicit coordinates
+	 * const northRoom = dungeon.getStep({ x: 1, y: 1, z: 0 }, DIRECTION.NORTH);
+	 *
+	 * // Using a room instance
+	 * const eastRoom = dungeon.getStep(start, DIRECTION.EAST);
+	 *
+	 * // Diagonal movement
+	 * const neRoom = dungeon.getStep(start, DIRECTION.NORTHEAST);
+	 *
+	 * // Vertical movement
+	 * const upRoom = dungeon.getStep(start, DIRECTION.UP);
+	 *
+	 * // Returns undefined if moving out of bounds
+	 * const invalid = dungeon.getStep(start, DIRECTION.WEST); // undefined if at x=0
+	 * ```
 	 */
 	getStep(coordinates: Coordinates | Room, direction: DIRECTION) {
 		if (coordinates instanceof Room) coordinates = coordinates.coordinates;
@@ -369,27 +654,6 @@ export class Dungeon {
 	}
 }
 
-/**
- * Configuration options for creating a new DungeonObject instance.
- *
- * @property dungeon - Optional reference to the dungeon this object belongs to.
- *                    If provided, the object will be automatically added to the dungeon.
- *
- * @example
- * ```typescript
- * // Create object without dungeon
- * const standalone = new DungeonObject();
- *
- * // Create object and add to dungeon immediately
- * const inDungeon = new DungeonObject({
- *   dungeon: existingDungeon
- * });
- *
- * // Object is already in the dungeon
- * console.log(inDungeon.dungeon === existingDungeon); // true
- * console.log(existingDungeon.contains(inDungeon)); // true
- * ```
- */
 export type DungeonObjectOptions = {
 	keywords?: string;
 	display?: string;
@@ -417,32 +681,45 @@ export type DungeonObjectOptions = {
  * console.log(bag.contains(sword)); // true
  * console.log(sword.location === bag); // true
  * ```
- *
- * Features:
- * - Keyword-based identification
- * - Display name and description
- * - Container functionality
- * - Location tracking
- * - Dungeon membership management
- * - Recursive containment updates
  */
 export class DungeonObject {
-	/** Keywords for referring to this object. */
+	/**
+	 * Space-separated list of words that can be used to identify this object.
+	 * Used by the match() method for object identification and targeting.
+	 */
 	keywords: string = "dungeon object";
 
-	/** The display string for this object. */
+	/**
+	 * Human-readable name for this object, shown in interfaces and output.
+	 */
 	display: string = "Dungeon Object";
 
-	/** A description of this object. */
+	/**
+	 * Detailed description of this object, shown when examining or looking.
+	 * Can include multiple sentences and rich descriptive text about the
+	 * object's appearance, state, and notable features.
+	 */
 	description: string = "It's an object.";
 
-	/** Dungeon objects that we are holding. */
+	/**
+	 * Array of objects directly contained by this object. Acts as a container
+	 * registry for inventory, room contents, or nested object hierarchies.
+	 * @private
+	 */
 	private _contents: DungeonObject[] = [];
 
-	/** The Dungeon we are in. */
+	/**
+	 * Reference to the dungeon this object belongs to, if any.
+	 * All objects in a containment tree share the same dungeon reference.
+	 * @private
+	 */
 	private _dungeon?: Dungeon;
 
-	/** Dungeon Objects occupy other Dungeon Objects. */
+	/**
+	 * Reference to the container holding this object, if any.
+	 * Forms part of the object containment hierarchy along with _contents.
+	 * @private
+	 */
 	private _location?: DungeonObject;
 
 	/**
@@ -563,7 +840,7 @@ export class DungeonObject {
 	 *
 	 * @example
 	 * ```typescript
-	 * const dungeon = new Dungeon({ dimensions: { width: 5, height: 5, layers: 1 } });
+	 * const dungeon = Dungeon.generateEmptyDungeon({ dimensions: { width: 5, height: 5, layers: 1 } });
 	 * const room = dungeon.getRoom({coordinates: {x:0, y:0, z:0}});
 	 * const item = new DungeonObject({ keywords: "gem" });
 	 * item.move(room); // item is now tracked in dungeon.contents
@@ -631,10 +908,29 @@ export class DungeonObject {
 	}
 
 	/**
-	 * Add objects to our contents.
-	 * Recursively set the object's location.
-	 * @param dobjs
-	 * @returns
+	 * Add objects to this container's contents.
+	 * Also sets each object's location to this container. Objects already in this
+	 * container are ignored. This method maintains containment consistency by
+	 * ensuring both the contents array and location references are updated.
+	 *
+	 * @param dobjs The objects to add to this container
+	 *
+	 * @example
+	 * ```typescript
+	 * const chest = new DungeonObject({ keywords: "chest" });
+	 * const coin = new DungeonObject({ keywords: "coin" });
+	 * const gem = new DungeonObject({ keywords: "gem" });
+	 *
+	 * // Add multiple items at once
+	 * chest.add(coin, gem);
+	 *
+	 * // Items are now in the chest
+	 * console.log(chest.contains(coin)); // true
+	 * console.log(coin.location === chest); // true
+	 *
+	 * // Adding an item that's already contained is ignored
+	 * chest.add(coin); // no effect
+	 * ```
 	 */
 	add(...dobjs: DungeonObject[]) {
 		for (let obj of dobjs) {
@@ -645,9 +941,30 @@ export class DungeonObject {
 	}
 
 	/**
-	 * Remove objects from our contents.
-	 * Recursively unset the object's location.
-	 * @param dobjs
+	 * Remove objects from this container's contents.
+	 * Also unsets each object's location if it points to this container.
+	 * Objects not found in the contents are ignored. This method maintains
+	 * containment consistency by ensuring both the contents array and location
+	 * references are updated.
+	 *
+	 * @param dobjs The objects to remove from this container
+	 *
+	 * @example
+	 * ```typescript
+	 * const chest = new DungeonObject({ keywords: "chest" });
+	 * const coin = new DungeonObject({ keywords: "coin" });
+	 *
+	 * // Add and then remove an item
+	 * chest.add(coin);
+	 * console.log(chest.contains(coin)); // true
+	 *
+	 * chest.remove(coin);
+	 * console.log(chest.contains(coin)); // false
+	 * console.log(coin.location === undefined); // true
+	 *
+	 * // Removing an item that's not contained is ignored
+	 * chest.remove(coin); // no effect
+	 * ```
 	 */
 	remove(...dobjs: DungeonObject[]) {
 		for (let obj of dobjs) {
@@ -659,9 +976,37 @@ export class DungeonObject {
 	}
 
 	/**
-	 * Check if we contain this object.
-	 * @param dobj
-	 * @returns
+	 * Check if we directly contain the given object.
+	 *
+	 * This method tests whether the specified object is immediately present in
+	 * this container's `contents` array. It does not perform a deep or recursive
+	 * search. To check for nested containment (for example, whether the object
+	 * exists anywhere inside this container's subtree), you can walk the
+	 * containment graph manually or implement a helper that searches recursively.
+	 *
+	 * @param dobj The object to test for direct containment
+	 * @returns true if `dobj` is directly contained by this object
+	 *
+	 * @example
+	 * ```typescript
+	 * const bag = new DungeonObject({ keywords: "bag" });
+	 * const pouch = new DungeonObject({ keywords: "pouch" });
+	 * const coin = new DungeonObject({ keywords: "coin" });
+	 * bag.add(pouch);
+	 * pouch.add(coin);
+	 *
+	 * console.log(bag.contains(pouch)); // true (direct)
+	 * console.log(bag.contains(coin)); // false (coin is nested inside pouch)
+	 * // To check nested containment:
+	 * function containsRecursive(container: DungeonObject, target: DungeonObject): boolean {
+	 *   if (container.contains(target)) return true;
+	 *   for (const child of container.contents) {
+	 *     if (containsRecursive(child, target)) return true;
+	 *   }
+	 *   return false;
+	 * }
+	 * console.log(containsRecursive(bag, coin)); // true
+	 * ```
 	 */
 	contains(dobj: DungeonObject) {
 		return this._contents.indexOf(dobj) !== -1;
@@ -719,27 +1064,6 @@ export type Coordinates = {
 	z: number;
 };
 
-/**
- * Configuration options for creating a new Room instance.
- * Extends DungeonObjectOptions to include room-specific properties.
- *
- * @property coordinates - The position of the room in the dungeon
- * @property dungeon - Optional reference to the dungeon (inherited from DungeonObjectOptions)
- *
- * @example
- * ```typescript
- * // Create a room with specific coordinates
- * const options: RoomOptions = {
- *   coordinates: { x: 1, y: 1, z: 0 },
- *   dungeon: existingDungeon
- * };
- * const room = new Room(options);
- *
- * // Room is positioned and added to dungeon
- * console.log(room.x === 1); // true
- * console.log(room.dungeon === existingDungeon); // true
- * ```
- */
 export type RoomOptions = {
 	coordinates: Coordinates;
 } & DungeonObjectOptions;
@@ -781,6 +1105,12 @@ export class Room extends DungeonObject {
 	keywords = "room";
 	display = "A Room";
 	description = "It's a room.";
+
+	/**
+	 * The position of this room in the dungeon's coordinate system.
+	 * Set during construction and immutable afterwards.
+	 * @private
+	 */
 	private _coordinates: Coordinates;
 	/**
 	 * Returns a shallow copy of the room's coordinates.
@@ -842,6 +1172,28 @@ export class Room extends DungeonObject {
 		this._coordinates = options.coordinates;
 	}
 
+	/**
+	 * Gets the room adjacent to this room in the specified direction.
+	 * Returns undefined if there is no room in that direction or if this room
+	 * is not part of a dungeon.
+	 *
+	 * @param dir The direction to check for an adjacent room
+	 * @returns The adjacent Room instance or undefined
+	 *
+	 * @example
+	 * ```typescript
+	 * const room = dungeon.getRoom({ x: 1, y: 1, z: 0 });
+	 *
+	 * // Check basic directions
+	 * const northRoom = room.getStep(DIRECTION.NORTH);
+	 * if (northRoom) {
+	 *   console.log("There is a room to the north");
+	 * }
+	 *
+	 * // Check diagonal movement
+	 * const northeastRoom = room.getStep(DIRECTION.NORTHEAST);
+	 * ```
+	 */
 	getStep(dir: DIRECTION) {
 		return this.dungeon?.getStep(this, dir);
 	}
@@ -968,7 +1320,14 @@ export class Room extends DungeonObject {
  * - Movement event hooks (through Room)
  */
 export class Movable extends DungeonObject {
-	/** Ultimately an alias for the coordinates of the room we're in (if we're in one). */
+	/**
+	 * Cache of the current room coordinates where this object resides.
+	 * This is synchronized with the containing room's coordinates when the
+	 * object moves between rooms, and cleared when not in a room.
+	 * Caching coordinates improves performance by avoiding frequent room lookups
+	 * during movement and position checks.
+	 * @private
+	 */
 	private _coordinates: Coordinates | undefined;
 
 	/**
@@ -1154,7 +1513,7 @@ export class Movable extends DungeonObject {
 		if (!exit) return false;
 		if (!(this.location instanceof Room)) return false;
 		if (!this.location.canExit(this, dir)) return;
-		if (!exit.canEnter(this, reverseDirection(dir))) return false;
+		if (!exit.canEnter(this, dir2reverse(dir))) return false;
 		return true;
 	}
 
@@ -1196,6 +1555,6 @@ export class Movable extends DungeonObject {
 		if (this.location instanceof Room) this.location.onExit(this, dir);
 		this.move(exit);
 		if (this.location instanceof Room)
-			this.location.onEnter(this, reverseDirection(dir));
+			this.location.onEnter(this, dir2reverse(dir));
 	}
 }
