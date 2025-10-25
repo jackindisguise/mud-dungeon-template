@@ -1949,8 +1949,6 @@ export class RoomLink {
 	 * @param oneWay When true only `fromRoom` will register the link; traversal back from `toRoom` will not use this link
 	 * @returns The created RoomLink instance (already registered on the appropriate rooms)
 	 *
-	 * @throws Error if the reverse direction for `direction` cannot be inferred
-	 *
 	 * @example
 	 * // Two-way link: moving NORTH from roomA goes to roomB, and moving SOUTH from roomB returns to roomA
 	 * const link = RoomLink.createTunnel(roomA, DIRECTION.NORTH, roomB);
