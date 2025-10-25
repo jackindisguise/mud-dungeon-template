@@ -142,24 +142,88 @@ export function dir2text(dir: DIRECTION) {
 	return DIR2TEXT.get(dir);
 }
 
+/**
+ * Checks if a direction has a northward component.
+ * Returns true for NORTH, NORTHEAST, and NORTHWEST.
+ *
+ * @param dir The direction to check
+ * @returns true if the direction includes a northward component
+ *
+ * @example
+ * ```typescript
+ * isNorthward(DIRECTION.NORTH); // true
+ * isNorthward(DIRECTION.NORTHEAST); // true
+ * isNorthward(DIRECTION.NORTHWEST); // true
+ * isNorthward(DIRECTION.SOUTH); // false
+ * isNorthward(DIRECTION.EAST); // false
+ * ```
+ */
 export function isNorthward(dir: DIRECTION) {
 	return [DIRECTION.NORTH, DIRECTION.NORTHEAST, DIRECTION.NORTHWEST].includes(
 		dir
 	);
 }
 
+/**
+ * Checks if a direction has a southward component.
+ * Returns true for SOUTH, SOUTHEAST, and SOUTHWEST.
+ *
+ * @param dir The direction to check
+ * @returns true if the direction includes a southward component
+ *
+ * @example
+ * ```typescript
+ * isSouthward(DIRECTION.SOUTH); // true
+ * isSouthward(DIRECTION.SOUTHEAST); // true
+ * isSouthward(DIRECTION.SOUTHWEST); // true
+ * isSouthward(DIRECTION.NORTH); // false
+ * isSouthward(DIRECTION.WEST); // false
+ * ```
+ */
 export function isSouthward(dir: DIRECTION) {
 	return [DIRECTION.SOUTH, DIRECTION.SOUTHEAST, DIRECTION.SOUTHWEST].includes(
 		dir
 	);
 }
 
+/**
+ * Checks if a direction has an eastward component.
+ * Returns true for EAST, NORTHEAST, and SOUTHEAST.
+ *
+ * @param dir The direction to check
+ * @returns true if the direction includes an eastward component
+ *
+ * @example
+ * ```typescript
+ * isEastward(DIRECTION.EAST); // true
+ * isEastward(DIRECTION.NORTHEAST); // true
+ * isEastward(DIRECTION.SOUTHEAST); // true
+ * isEastward(DIRECTION.WEST); // false
+ * isEastward(DIRECTION.NORTH); // false
+ * ```
+ */
 export function isEastward(dir: DIRECTION) {
 	return [DIRECTION.EAST, DIRECTION.SOUTHEAST, DIRECTION.NORTHEAST].includes(
 		dir
 	);
 }
 
+/**
+ * Checks if a direction has a westward component.
+ * Returns true for WEST, NORTHWEST, and SOUTHWEST.
+ *
+ * @param dir The direction to check
+ * @returns true if the direction includes a westward component
+ *
+ * @example
+ * ```typescript
+ * isWestward(DIRECTION.WEST); // true
+ * isWestward(DIRECTION.NORTHWEST); // true
+ * isWestward(DIRECTION.SOUTHWEST); // true
+ * isWestward(DIRECTION.EAST); // false
+ * isWestward(DIRECTION.SOUTH); // false
+ * ```
+ */
 export function isWestward(dir: DIRECTION) {
 	return [DIRECTION.WEST, DIRECTION.SOUTHWEST, DIRECTION.NORTHWEST].includes(
 		dir
