@@ -1474,6 +1474,34 @@ export class Room extends DungeonObject {
 	 * ```
 	 */
 	onExit(movable: Movable, direction?: DIRECTION) {}
+
+	/**
+	 * Generates a room reference string for this room in the format `@dungeon-id{x,y,z}`.
+	 * Returns undefined if the room's dungeon does not have an ID.
+	 * This reference can be parsed back into a Room using `getRoomByRef()`.
+	 *
+	 * @returns The room reference string, or undefined if the dungeon has no ID
+	 *
+	 * @example
+	 * ```typescript
+	 * const dungeon = Dungeon.generateEmptyDungeon({
+	 *   id: "castle",
+	 *   dimensions: { width: 10, height: 10, layers: 1 }
+	 * });
+	 * const room = dungeon.getRoom({ x: 5, y: 3, z: 0 });
+	 *
+	 * const ref = room.getRoomRef();
+	 * console.log(ref); // "@castle{5,3,0}"
+	 *
+	 * // Can be parsed back into a room
+	 * const sameRoom = getRoomByRef(ref);
+	 * console.log(sameRoom === room); // true
+	 * ```
+	 */
+	getRoomRef(): string | undefined {
+		if (!this.dungeon?.id) return undefined;
+		return `@${this.dungeon.id}{${this.x},${this.y},${this.z}}`;
+	}
 }
 
 /**

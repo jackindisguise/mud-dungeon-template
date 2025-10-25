@@ -6,8 +6,6 @@ A 3D room/grid system for text-based games (MUDs). It provides room objects, con
 
 ## Directional movement
 
-The system represents directions using bitwise flags which enables combining directions (e.g. north + east -> northeast).
-
 - `DIRECTION` — enum of cardinal, vertical and composite directions
 - `dir2text(dir)` — convert a DIRECTION to human-readable text
 - `dir2reverse(dir)` — returns the opposite direction
@@ -68,18 +66,74 @@ const found = getDungeonById("midgar");
 console.log(found === dungeon); // true
 ```
 
-### Room References
+## Room References
 
-Use `getRoomByRef()` to parse string-based room references in the format `@dungeon-id{x,y,z}`:
+The `getRoomByRef()` function provides a convenient way to look up rooms across all registered dungeons using a string-based reference format.
+
+### Format
+
+Room references use the pattern: `@dungeon-id{x,y,z}`
+
+- `@` — Required prefix indicating a room reference
+- `dungeon-id` — The ID of the dungeon (must be registered)
+- `{x,y,z}` — The room coordinates enclosed in braces
+
+### Examples
 
 ```ts
+// Create a registered dungeon
+const dungeon = Dungeon.generateEmptyDungeon({
+	id: "midgar",
+	dimensions: { width: 10, height: 10, layers: 3 }
+});
+
+// Look up a specific room using a reference string
 const room = getRoomByRef("@midgar{5,3,1}");
 if (room) {
 	console.log(`Found room at ${room.x},${room.y},${room.z}`);
 }
 ```
 
-This is useful for loading room data from configuration files, implementing teleport commands, or defining spawn points.
+### Use Cases
+
+Room references are particularly useful for:
+
+- **Configuration files**: Define spawn points, quest locations, or teleport destinations
+  ```json
+  {
+    "spawnPoint": "@town{5,5,0}",
+    "questLocations": ["@dungeon{3,7,2}", "@forest{10,15,0}"]
+  }
+  ```
+
+- **Teleport commands**: Allow players or admins to jump to specific locations
+  ```ts
+  function teleport(player: Movable, roomRef: string) {
+    const destination = getRoomByRef(roomRef);
+    if (destination) {
+      destination.add(player);
+    }
+  }
+  ```
+
+- **Serialization**: Save and restore object locations across game sessions
+  ```ts
+  // Save
+  const savedLocation = `@${room.dungeon?.id}{${room.x},${room.y},${room.z}}`;
+  
+  // Load
+  const room = getRoomByRef(savedLocation);
+  if (room) player.move(room);
+  ```
+
+- **Room links**: Create portals to specific destinations defined in data files
+  ```ts
+  const exitRoom = dungeon.getRoom({ x: 9, y: 9, z: 0 });
+  const destination = getRoomByRef("@nextArea{0,0,0}");
+  if (destination) {
+    RoomLink.createTunnel(exitRoom, DIRECTION.EAST, destination);
+  }
+  ```
 
 ## Objects and Movables
 

@@ -611,6 +611,38 @@ suite("dungeon.ts", () => {
 			assert(room.canEnter(movable));
 			assert(room.canExit(movable));
 		});
+
+		test("getRoomRef() should generate a room reference string", () => {
+			const id = "test-room-ref";
+			const dungeon = Dungeon.generateEmptyDungeon({
+				id,
+				dimensions: { width: 5, height: 5, layers: 2 },
+			});
+			try {
+				const room = dungeon.getRoom({ x: 3, y: 4, z: 1 });
+				assert(room);
+
+				const ref = room.getRoomRef();
+				assert.strictEqual(ref, "@test-room-ref{3,4,1}");
+
+				// Verify the reference can be parsed back to the same room
+				const parsedRoom = getRoomByRef(ref!);
+				assert.strictEqual(parsedRoom, room);
+			} finally {
+				DUNGEON_REGISTRY.delete(id);
+			}
+		});
+
+		test("getRoomRef() should return undefined when dungeon has no ID", () => {
+			const dungeon = Dungeon.generateEmptyDungeon({
+				dimensions: { width: 2, height: 2, layers: 1 },
+			});
+			const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
+			assert(room);
+
+			const ref = room.getRoomRef();
+			assert.strictEqual(ref, undefined);
+		});
 	});
 
 	suite("RoomLink", () => {
