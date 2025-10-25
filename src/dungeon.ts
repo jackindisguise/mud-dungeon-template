@@ -2,40 +2,25 @@ import { string } from "mud-ext";
 
 /**
  * Enum for handling directional movement in the dungeon.
- * Uses bitwise flags to allow for composite directions (diagonals).
- *
- * Basic directions are powers of 2 (using bit shifts),
- * while diagonal directions are combinations of cardinal directions using bitwise OR.
  *
  * @example
  * ```typescript
  * // Using basic directions
  * player.step(DIRECTION.NORTH);
  * player.step(DIRECTION.UP);
- *
- * // Using diagonal directions
- * player.step(DIRECTION.NORTHEAST);
- *
- * // Creating diagonal directions manually (same as predefined)
- * const diagonal = DIRECTION.NORTH | DIRECTION.EAST; // Same as DIRECTION.NORTHEAST
- * player.step(diagonal);
- *
- * // Checking if a direction contains a component
- * const hasNorth = (DIRECTION.NORTHEAST & DIRECTION.NORTH) !== 0; // true
- * const hasUp = (DIRECTION.NORTHEAST & DIRECTION.UP) !== 0; // false
  * ```
  */
 export enum DIRECTION {
-	NORTH = 1 << 0,
-	SOUTH = 1 << 1,
-	EAST = 1 << 2,
-	WEST = 1 << 3,
-	UP = 1 << 4,
-	DOWN = 1 << 5,
-	NORTHEAST = NORTH | EAST,
-	NORTHWEST = NORTH | WEST,
-	SOUTHEAST = SOUTH | EAST,
-	SOUTHWEST = SOUTH | WEST,
+	NORTH,
+	SOUTH,
+	EAST,
+	WEST,
+	UP,
+	DOWN,
+	NORTHEAST,
+	NORTHWEST,
+	SOUTHEAST,
+	SOUTHWEST,
 }
 
 /**
@@ -62,8 +47,6 @@ const DIR2REVERSE = new Map<DIRECTION, DIRECTION>([
 	[DIRECTION.WEST, DIRECTION.EAST],
 	[DIRECTION.UP, DIRECTION.DOWN],
 	[DIRECTION.DOWN, DIRECTION.UP],
-
-	// combinations
 	[DIRECTION.NORTHEAST, DIRECTION.SOUTHWEST],
 	[DIRECTION.NORTHWEST, DIRECTION.SOUTHEAST],
 	[DIRECTION.SOUTHEAST, DIRECTION.NORTHWEST],
@@ -98,8 +81,8 @@ const DIR2REVERSE = new Map<DIRECTION, DIRECTION>([
  * }
  * ```
  */
-export function dir2reverse(dir: DIRECTION) {
-	return DIR2REVERSE.get(dir);
+export function dir2reverse(dir: DIRECTION): DIRECTION {
+	return DIR2REVERSE.get(dir)!;
 }
 
 /**
@@ -134,12 +117,8 @@ const DIR2TEXT = new Map<DIRECTION, string>([
 	[DIRECTION.SOUTH, "south"],
 	[DIRECTION.EAST, "east"],
 	[DIRECTION.WEST, "west"],
-
-	// up/down
 	[DIRECTION.UP, "up"],
 	[DIRECTION.DOWN, "down"],
-
-	// combinations
 	[DIRECTION.NORTHEAST, "northeast"],
 	[DIRECTION.NORTHWEST, "northwest"],
 	[DIRECTION.SOUTHEAST, "southeast"],
@@ -161,6 +140,30 @@ const DIR2TEXT = new Map<DIRECTION, string>([
  */
 export function dir2text(dir: DIRECTION) {
 	return DIR2TEXT.get(dir);
+}
+
+export function isNorthward(dir: DIRECTION) {
+	return [DIRECTION.NORTH, DIRECTION.NORTHEAST, DIRECTION.NORTHWEST].includes(
+		dir
+	);
+}
+
+export function isSouthward(dir: DIRECTION) {
+	return [DIRECTION.SOUTH, DIRECTION.SOUTHEAST, DIRECTION.SOUTHWEST].includes(
+		dir
+	);
+}
+
+export function isEastward(dir: DIRECTION) {
+	return [DIRECTION.EAST, DIRECTION.SOUTHEAST, DIRECTION.NORTHEAST].includes(
+		dir
+	);
+}
+
+export function isWestward(dir: DIRECTION) {
+	return [DIRECTION.WEST, DIRECTION.SOUTHWEST, DIRECTION.NORTHWEST].includes(
+		dir
+	);
 }
 
 /**
@@ -219,8 +222,28 @@ export const DUNGEON_REGISTRY: Map<string, Dungeon> = new Map();
 
 /**
  * Lookup a dungeon previously registered with an ID.
+ *
+ * Only dungeons that were created with an `id` option or had their `id`
+ * property set will be present in the registry. This function provides a
+ * global lookup mechanism for retrieving dungeon instances by their unique
+ * identifier, which is useful for serialization, room references, and
+ * cross-dungeon navigation.
+ *
  * @param id The dungeon id to look up
  * @returns The Dungeon instance or undefined when not found
+ *
+ * @example
+ * ```typescript
+ * // Create a dungeon with an ID
+ * const dungeon = new Dungeon({
+ *   id: "midgar",
+ *   dimensions: { width: 10, height: 10, layers: 3 }
+ * });
+ *
+ * // Look it up later from anywhere
+ * const found = getDungeonById("midgar");
+ * console.log(found === dungeon); // true
+ * ```
  */
 export function getDungeonById(id: string) {
 	return DUNGEON_REGISTRY.get(id);
@@ -248,11 +271,6 @@ export function getDungeonById(id: string) {
  * if (room) {
  *   console.log(`Found room at ${room.x},${room.y},${room.z}`);
  * }
- *
- * // Invalid formats return undefined
- * getRoomByRef("invalid"); // undefined
- * getRoomByRef("@nonexistent{0,0,0}"); // undefined (dungeon not found)
- * getRoomByRef("@midgar{99,99,99}"); // undefined (out of bounds)
  * ```
  */
 export function getRoomByRef(roomRef: string): Room | undefined {
@@ -306,7 +324,7 @@ export class Dungeon {
 	 * Can be undefined before grid initialization or contain undefined slots
 	 * for ungenerated rooms.
 	 */
-	private _rooms?: (Room | undefined)[][][];
+	private _rooms: (Room | undefined)[][][];
 
 	/**
 	 * Optional persistent identifier for this dungeon. When assigned the
@@ -370,10 +388,10 @@ export class Dungeon {
 		this._dimensions = options.dimensions;
 		// assign id early so the registry contains the dungeon immediately
 		if (options.id) this.id = options.id;
-		this.generateGrid();
+		this._rooms = this.generateGrid();
 	}
 
-	get id() {
+	get id(): string | undefined {
 		return this._id;
 	}
 
@@ -382,21 +400,17 @@ export class Dungeon {
 	 * will unregister the dungeon. Setting to a string will register it or
 	 * throw if the id is already in use by another dungeon.
 	 */
-	private set id(value: string | undefined) {
-		if (this._id === value) return;
-
+	private set id(value: string) {
 		// unregister old id
-		if (this._id) {
+		/*if (this._id) {
 			DUNGEON_REGISTRY.delete(this._id);
 			this._id = undefined;
-		}
+		}*/
 
-		if (value) {
-			if (DUNGEON_REGISTRY.has(value))
-				throw new Error(`Dungeon id "${value}" is already in use`);
-			this._id = value;
-			DUNGEON_REGISTRY.set(value, this);
-		}
+		if (DUNGEON_REGISTRY.has(value))
+			throw new Error(`Dungeon id "${value}" is already in use`);
+		this._id = value;
+		DUNGEON_REGISTRY.set(value, this);
 	}
 
 	/**
@@ -551,7 +565,7 @@ export class Dungeon {
 			}
 			rooms.push(layer);
 		}
-		this._rooms = rooms;
+		return rooms;
 	}
 
 	/**
@@ -571,7 +585,6 @@ export class Dungeon {
 	 * ```
 	 */
 	generateRooms() {
-		if (!this._rooms) return;
 		for (let z = 0; z < this._dimensions.layers; z++)
 			for (let y = 0; y < this._dimensions.height; y++)
 				for (let x = 0; x < this._dimensions.width; x++)
@@ -611,9 +624,6 @@ export class Dungeon {
 			z >= this._dimensions.layers
 		)
 			return false;
-
-		// Ensure the room grid exists
-		if (!this._rooms) return false;
 
 		this._rooms[z][y][x] = room;
 		room.dungeon = this;
@@ -693,13 +703,10 @@ export class Dungeon {
 			typeof z === "number"
 		) {
 			coords = { x: coordsOrX, y, z };
-		} else if (typeof coordsOrX === "object") {
-			coords = coordsOrX;
 		} else {
-			return undefined;
+			coords = coordsOrX as Coordinates;
 		}
 
-		if (!this._rooms) return;
 		if (coords.x < 0 || coords.x >= this._dimensions.width) return;
 		if (coords.y < 0 || coords.y >= this._dimensions.height) return;
 		if (coords.z < 0 || coords.z >= this._dimensions.layers) return;
@@ -708,9 +715,8 @@ export class Dungeon {
 
 	/**
 	 * Gets the room adjacent to a given position in the specified direction.
-	 * This method handles both cardinal and diagonal movement by using bitwise
-	 * direction flags. The input coordinates can be either explicit coordinates
-	 * or a Room instance (in which case its coordinates are used).
+	 * The input coordinates can be either explicit coordinates or a Room
+	 * instance (in which case its coordinates are used).
 	 *
 	 * @param coordinates Starting position as either Coordinates or a Room instance
 	 * @param direction The direction to move, can be a single direction or combination
@@ -741,12 +747,12 @@ export class Dungeon {
 	 */
 	getStep(coordinates: Coordinates | Room, direction: DIRECTION) {
 		if (coordinates instanceof Room) coordinates = coordinates.coordinates;
-		if (direction & DIRECTION.NORTH) coordinates.y--;
-		if (direction & DIRECTION.SOUTH) coordinates.y++;
-		if (direction & DIRECTION.EAST) coordinates.x++;
-		if (direction & DIRECTION.WEST) coordinates.x--;
-		if (direction & DIRECTION.UP) coordinates.z++;
-		if (direction & DIRECTION.DOWN) coordinates.z--;
+		if (isNorthward(direction)) coordinates.y--;
+		if (isSouthward(direction)) coordinates.y++;
+		if (isEastward(direction)) coordinates.x++;
+		if (isWestward(direction)) coordinates.x--;
+		if (direction === DIRECTION.UP) coordinates.z++;
+		if (direction === DIRECTION.DOWN) coordinates.z--;
 		return this.getRoom(coordinates);
 	}
 }
@@ -957,7 +963,7 @@ export class DungeonObject {
 	 * Assigning a new location will remove the object from its previous container
 	 * and add it to the new container. Setting to `undefined` removes it from any container.
 	 *
-s	 * @example
+	 * @example
 	 * ```typescript
 	 * const chest = new DungeonObject({ keywords: "wooden chest" });
 	 * const coin = new DungeonObject({ keywords: "gold coin" });
@@ -1692,9 +1698,9 @@ export class Movable extends DungeonObject {
 	 * ```
 	 */
 	canStep(dir: DIRECTION): boolean {
+		if (!(this.location instanceof Room)) return false;
 		const exit = this.getStep(dir);
 		if (!exit) return false;
-		if (!(this.location instanceof Room)) return false;
 		if (!this.location.canExit(this, dir)) return false;
 		if (!exit.canEnter(this, dir2reverse(dir))) return false;
 		return true;
@@ -1734,7 +1740,6 @@ export class Movable extends DungeonObject {
 	step(dir: DIRECTION): boolean {
 		if (!this.canStep(dir)) return false;
 		const exit = this.getStep(dir);
-		if (!exit) return false;
 		if (this.location instanceof Room) this.location.onExit(this, dir);
 		this.move(exit);
 		if (this.location instanceof Room)
@@ -1870,8 +1875,6 @@ export class RoomLink {
 	) {
 		// infer the reverse direction automatically
 		const reverse = dir2reverse(direction);
-		if (reverse === undefined)
-			throw new Error("Unable to infer reverse direction for given direction");
 
 		const link = new RoomLink({
 			from: { room: fromRoom, direction },

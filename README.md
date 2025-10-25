@@ -2,27 +2,34 @@
 
 # MUD Dungeon System
 
-A 3D room/grid system for text-based games (MUDs). It provides room objects, containment hierarchies, movement primitives, and an extensible linking system that lets you override spatial relationships between rooms (including one-way portals).
+A 3D room/grid system for text-based games (MUDs). It provides room objects, containment hierarchies, movement primitives, an extensible linking system for non-Euclidean portals, and a persistent dungeon registry for serialization and cross-dungeon references.
 
 ## Directional movement
 
 The system represents directions using bitwise flags which enables combining directions (e.g. north + east -> northeast).
 
-- `DIRECTION` — enum of cardinal, vertical and composite directions.
-- `dir2text(dir)` — convert a DIRECTION to human-readable text.
-- `dir2reverse(dir)` — returns the opposite direction.
+- `DIRECTION` — enum of cardinal, vertical and composite directions
+- `dir2text(dir)` — convert a DIRECTION to human-readable text
+- `dir2reverse(dir)` — returns the opposite direction
 
 ### Examples
 
 ```ts
-// Cardinal directions
-DIRECTION.NORTH, DIRECTION.SOUTH, DIRECTION.EAST, DIRECTION.WEST
+enum DIRECTION {
+	NORTH,
+	SOUTH,
+	EAST,
+	WEST,
+	UP,
+	DOWN,
+	NORTHEAST,
+	NORTHWEST,
+	SOUTHEAST,
+	SOUTHWEST,
+}
 
-// Vertical
-DIRECTION.UP, DIRECTION.DOWN
-
-// Combine flags for diagonals
-const diag = DIRECTION.NORTH | DIRECTION.EAST; // same as DIRECTION.NORTHEAST
+console.log(dir2text(DIRECTION.NORTH)); // "north"
+console.log(dir2reverse(DIRECTION.NORTH)); // DIRECTION.SOUTH
 ```
 
 ## Dungeon and Rooms
@@ -30,7 +37,11 @@ const diag = DIRECTION.NORTH | DIRECTION.EAST; // same as DIRECTION.NORTHEAST
 Use `Dungeon` to create a 3D grid of rooms. Rooms are addressed by `{x, y, z}` coordinates.
 
 ```ts
-const dungeon = Dungeon.generateEmptyDungeon({ dimensions: { width: 10, height: 10, layers: 3 } });
+const dungeon = Dungeon.generateEmptyDungeon({ 
+	id: "castle",
+	dimensions: { width: 10, height: 10, layers: 3 } 
+});
+
 const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
 const northRoom = room.getStep(DIRECTION.NORTH);
 ```
@@ -41,9 +52,38 @@ Rooms are `DungeonObject`s and support containment, naming (keywords/display/des
 - `canExit(movable, direction?)` — override to restrict exiting
 - `onEnter(movable, direction?)` / `onExit(movable, direction?)` — event hooks
 
+## Dungeon Registry
+
+Dungeons with an `id` are automatically registered in `DUNGEON_REGISTRY` for global lookup. This enables serialization, persistent references, and cross-dungeon navigation.
+
+```ts
+// Create a dungeon with an ID
+const dungeon = new Dungeon({
+	id: "midgar",
+	dimensions: { width: 10, height: 10, layers: 3 }
+});
+
+// Look it up from anywhere
+const found = getDungeonById("midgar");
+console.log(found === dungeon); // true
+```
+
+### Room References
+
+Use `getRoomByRef()` to parse string-based room references in the format `@dungeon-id{x,y,z}`:
+
+```ts
+const room = getRoomByRef("@midgar{5,3,1}");
+if (room) {
+	console.log(`Found room at ${room.x},${room.y},${room.z}`);
+}
+```
+
+This is useful for loading room data from configuration files, implementing teleport commands, or defining spawn points.
+
 ## Objects and Movables
 
-`DungeonObject` is the base for represented items/containers. `Movable` extends it with movement helpers and coordinate caching.
+`DungeonObject` is the base for items and containers. `Movable` extends it with movement helpers and coordinate caching.
 
 ### Examples
 
@@ -57,7 +97,7 @@ if (player.canStep(DIRECTION.NORTH)) player.step(DIRECTION.NORTH);
 
 ## Location <-> Contents
 
-A `DungeonObject`'s location is always another `DungeonObject` or `undefined`. When it is another `DungeonObject`, there is a reciprocal relationship between `DungeonObject` `A` (the container) and `DungeonObject` `B` (the one contained). `A` must always have `B` in its `contents`, and `B` must always have its location set to `A`. If any one of these relationships changes, the other must change.
+A `DungeonObject`'s location is always another `DungeonObject` or `undefined`. When it is another `DungeonObject`, there is a reciprocal relationship between `DungeonObject` `A` (the container) and `DungeonObject` `B` (the contained object). `A` must always have `B` in its `contents`, and `B` must always have its location set to `A`. If either relationship changes, the other must change accordingly.
 
 ```ts
 const A = new DungeonObject();
@@ -82,26 +122,47 @@ assert(B.location === A); // must be true
 assert(C.contains(B) === false); // must be false
 ```
 
+### Dungeon Tracking
+
+When an object is placed in a room (or any container within a dungeon hierarchy), it and all its contents are automatically tracked by the dungeon:
+
+```ts
+const chest = new DungeonObject({ keywords: "chest" });
+const coin = new DungeonObject({ keywords: "coin" });
+chest.add(coin);
+
+const room = dungeon.getRoom({ x: 0, y: 0, z: 0 });
+room.add(chest);
+
+// Both chest and coin are now tracked by the dungeon
+assert(dungeon.contains(chest)); // true
+assert(dungeon.contains(coin)); // true
+
+// Get all objects in the dungeon (rooms + objects)
+const allObjects = dungeon.contents;
+```
+
+When moving objects between dungeons, all nested contents update their dungeon references automatically.
+
 ## Room links (portals/tunnels)
 
-A construction pattern for non-Euclidean room links, plus support for one-way portals.
+Create non-Euclidean room links with support for both two-way tunnels and one-way portals.
 
 - `RoomLink.createTunnel(fromRoom, direction, toRoom, oneWay = false)`
-  - Creates and registers a link.
-  - `direction` is the direction on `fromRoom` that leads to `toRoom`.
-  - If `oneWay` is true, the link will only be active from `fromRoom` -> `toRoom` (no return traversal).
-  - Otherwise, all tunnels are two-way.
-  - The `RoomLink` constructor is private — use the factory.
+  - Creates and registers a link between two rooms
+  - `direction` is the direction on `fromRoom` that leads to `toRoom`
+  - If `oneWay` is true, the link only works from `fromRoom` -> `toRoom` (no return path)
+  - Otherwise, creates a bidirectional tunnel with automatic reverse direction
 
 ### Examples
 
 #### Two-way link (tunnel)
 
 ```ts
-// moving NORTH from roomA will take you to roomB
+// Moving NORTH from roomA takes you to roomB
+// Moving SOUTH from roomB returns you to roomA
 const link = RoomLink.createTunnel(roomA, DIRECTION.NORTH, roomB);
 
-// now
 assert(roomA.getStep(DIRECTION.NORTH) === roomB);
 assert(roomB.getStep(DIRECTION.SOUTH) === roomA);
 ```
@@ -109,15 +170,43 @@ assert(roomB.getStep(DIRECTION.SOUTH) === roomA);
 #### One-way link (portal)
 
 ```ts
-// moving EAST from roomA goes to roomB, but moving WEST from roomB will NOT return to roomA
+// Moving EAST from roomA goes to roomB
+// But moving WEST from roomB does NOT return to roomA
 const oneWay = RoomLink.createTunnel(roomA, DIRECTION.EAST, roomB, true);
 
 assert(roomA.getStep(DIRECTION.EAST) === roomB);
 assert.notStrictEqual(roomB.getStep(DIRECTION.WEST), roomA);
 ```
 
-Notes & details
+#### Cross-dungeon links
 
-- The factory infers the reverse direction using `dir2reverse(direction)`; if the reverse cannot be inferred an error is thrown. This protects against accidental mismatches.
-- The `RoomLink` instance exposes `getDestination(fromRoom, direction)` which is used by `Room.getStep()` when resolving linked rooms. Permission checks (canEnter/canExit) remain the responsibility of the caller (e.g., movement logic in `Movable`).
-- Calling `remove()` on a link detaches it from both rooms — the operation is idempotent.
+```ts
+// Links work between rooms in different dungeons
+const dungeonA = Dungeon.generateEmptyDungeon({ 
+	id: "overworld",
+	dimensions: { width: 10, height: 10, layers: 1 } 
+});
+const dungeonB = Dungeon.generateEmptyDungeon({ 
+	id: "underworld",
+	dimensions: { width: 5, height: 5, layers: 1 } 
+});
+
+const entrance = dungeonA.getRoom({ x: 5, y: 5, z: 0 });
+const cave = dungeonB.getRoom({ x: 0, y: 0, z: 0 });
+
+// Create a portal between dungeons
+RoomLink.createTunnel(entrance, DIRECTION.DOWN, cave);
+
+// Player can now traverse between dungeons
+const player = new Movable();
+entrance.add(player);
+player.step(DIRECTION.DOWN); // Now in dungeonB
+assert(player.dungeon === dungeonB);
+```
+
+### Notes & details
+
+- The `RoomLink` instance exposes `getDestination(fromRoom, direction)` which is used by `Room.getStep()` when resolving linked rooms
+- Permission checks (`canEnter`/`canExit`) remain the responsibility of movement logic in `Movable`
+- Calling `remove()` on a link detaches it from both rooms — the operation is idempotent
+- Multiple links can exist on the same room in different directions
