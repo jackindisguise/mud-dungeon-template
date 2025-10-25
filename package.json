@@ -8,7 +8,9 @@
 	"main": "index.js",
 	"scripts": {
 		"build": "tsc",
-		"test": "npm run build && node --test \"dist/**/*.spec.js\"",
+		"test": "node --test \"dist/**/*.spec.js\"",
+		"coverage": "node --test --experimental-test-coverage \"dist/**/*.spec.js\"",
+		"deplay": "npm run build && npm run test && npm run coverage",
 		"doc": "npx typedoc src/*.ts"
 	},
 	"devDependencies": {

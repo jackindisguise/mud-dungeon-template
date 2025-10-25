@@ -193,6 +193,7 @@ export interface MapDimensions {
  * three-dimensional grid size for rooms. This type is intentionally simple so
  * it can be extended in the future with additional configuration options.
  *
+ * @property id - The unique string identifier of this dungeon.
  * @property dimensions - The width/height/layers of the dungeon grid.
  *
  * @example
@@ -204,7 +205,70 @@ export interface MapDimensions {
  * ```
  */
 export interface DungeonOptions {
+	id?: string;
 	dimensions: MapDimensions;
+}
+
+/**
+ * Registry of dungeons by their optional persistent ID.
+ * Use `getDungeonById(id)` to look up a registered dungeon.
+ *
+ * Note: only dungeons with an assigned `id` are present in this map.
+ */
+export const DUNGEON_REGISTRY: Map<string, Dungeon> = new Map();
+
+/**
+ * Lookup a dungeon previously registered with an ID.
+ * @param id The dungeon id to look up
+ * @returns The Dungeon instance or undefined when not found
+ */
+export function getDungeonById(id: string) {
+	return DUNGEON_REGISTRY.get(id);
+}
+
+/**
+ * Parse a room reference string and return the corresponding Room.
+ * The format is `@dungeon-id{x,y,z}` where dungeon-id is the registered
+ * dungeon identifier and x,y,z are the numeric coordinates.
+ *
+ * @param roomRef The room reference string in format `@dungeon-id{x,y,z}`
+ * @returns The Room instance if found, undefined if the format is invalid,
+ *          the dungeon doesn't exist, or the coordinates are out of bounds
+ *
+ * @example
+ * ```typescript
+ * // Register a dungeon with an id
+ * const dungeon = Dungeon.generateEmptyDungeon({
+ *   id: "midgar",
+ *   dimensions: { width: 10, height: 10, layers: 3 }
+ * });
+ *
+ * // Look up a room using the reference format
+ * const room = getRoomByRef("@midgar{5,3,1}");
+ * if (room) {
+ *   console.log(`Found room at ${room.x},${room.y},${room.z}`);
+ * }
+ *
+ * // Invalid formats return undefined
+ * getRoomByRef("invalid"); // undefined
+ * getRoomByRef("@nonexistent{0,0,0}"); // undefined (dungeon not found)
+ * getRoomByRef("@midgar{99,99,99}"); // undefined (out of bounds)
+ * ```
+ */
+export function getRoomByRef(roomRef: string): Room | undefined {
+	// Match pattern: @dungeon-id{x,y,z}
+	const match = roomRef.match(/^@([^{]+)\{(\d+),(\d+),(\d+)\}$/);
+	if (!match) return undefined;
+
+	const [, dungeonId, xStr, yStr, zStr] = match;
+	const dungeon = getDungeonById(dungeonId);
+	if (!dungeon) return undefined;
+
+	const x = parseInt(xStr, 10);
+	const y = parseInt(yStr, 10);
+	const z = parseInt(zStr, 10);
+
+	return dungeon.getRoom(x, y, z);
 }
 
 /**
@@ -243,6 +307,13 @@ export class Dungeon {
 	 * for ungenerated rooms.
 	 */
 	private _rooms?: (Room | undefined)[][][];
+
+	/**
+	 * Optional persistent identifier for this dungeon. When assigned the
+	 * dungeon is registered in `DUNGEON_REGISTRY` and can be looked up via
+	 * `getDungeonById(id)`.
+	 */
+	private _id?: string;
 
 	/**
 	 * Registry of all objects that exist in this dungeon, regardless of their
@@ -297,7 +368,35 @@ export class Dungeon {
 	 */
 	constructor(options: DungeonOptions) {
 		this._dimensions = options.dimensions;
+		// assign id early so the registry contains the dungeon immediately
+		if (options.id) this.id = options.id;
 		this.generateGrid();
+	}
+
+	get id() {
+		return this._id;
+	}
+
+	/**
+	 * Set the persistent dungeon id. Setting to `undefined`
+	 * will unregister the dungeon. Setting to a string will register it or
+	 * throw if the id is already in use by another dungeon.
+	 */
+	private set id(value: string | undefined) {
+		if (this._id === value) return;
+
+		// unregister old id
+		if (this._id) {
+			DUNGEON_REGISTRY.delete(this._id);
+			this._id = undefined;
+		}
+
+		if (value) {
+			if (DUNGEON_REGISTRY.has(value))
+				throw new Error(`Dungeon id "${value}" is already in use`);
+			this._id = value;
+			DUNGEON_REGISTRY.set(value, this);
+		}
 	}
 
 	/**
