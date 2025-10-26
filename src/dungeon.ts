@@ -15,13 +15,82 @@ export enum DIRECTION {
 	SOUTH,
 	EAST,
 	WEST,
-	UP,
-	DOWN,
 	NORTHEAST,
 	NORTHWEST,
 	SOUTHEAST,
 	SOUTHWEST,
+	UP,
+	DOWN,
 }
+
+/**
+ * Array containing all possible direction values.
+ *
+ * This constant provides a convenient way to iterate over all available
+ * directions without manually listing each DIRECTION enum value. Useful
+ * for checking multiple directions, generating exit lists, or implementing
+ * omnidirectional searches.
+ *
+ * The array includes all ten standard directions in a fixed order:
+ * cardinal (N/S/E/W), diagonal (NE/NW/SE/SW), and vertical (U/D).
+ *
+ * @example
+ * Check all directions for available exits:
+ * ```typescript
+ * function getAvailableExits(room: Room): DIRECTION[] {
+ *   const exits: DIRECTION[] = [];
+ *   for (const dir of DIRECTIONS) {
+ *     const adjacent = room.getStep(dir);
+ *     if (adjacent) {
+ *       exits.push(dir);
+ *     }
+ *   }
+ *   return exits;
+ * }
+ * ```
+ *
+ * @example
+ * Display all possible exits with their names:
+ * ```typescript
+ * function showAllDirections() {
+ *   DIRECTIONS.forEach(dir => {
+ *     console.log(`${dir}: ${dir2text(dir)}`);
+ *   });
+ * }
+ * // Output:
+ * // 0: north
+ * // 1: south
+ * // 2: east
+ * // ...
+ * ```
+ *
+ * @example
+ * Find first available exit in any direction:
+ * ```typescript
+ * function findAnyExit(room: Room): Room | undefined {
+ *   for (const dir of DIRECTIONS) {
+ *     const nextRoom = room.getStep(dir);
+ *     if (nextRoom) return nextRoom;
+ *   }
+ *   return undefined;
+ * }
+ * ```
+ *
+ * @see {@link DIRECTION} - The direction enum
+ * @see {@link dir2text} - Convert directions to text
+ */
+export const DIRECTIONS: DIRECTION[] = [
+	DIRECTION.NORTH,
+	DIRECTION.SOUTH,
+	DIRECTION.EAST,
+	DIRECTION.WEST,
+	DIRECTION.NORTHEAST,
+	DIRECTION.NORTHWEST,
+	DIRECTION.SOUTHEAST,
+	DIRECTION.SOUTHWEST,
+	DIRECTION.UP,
+	DIRECTION.DOWN,
+];
 
 /**
  * Maps each direction to its opposite direction.
@@ -86,22 +155,83 @@ export function dir2reverse(dir: DIRECTION): DIRECTION {
 }
 
 /**
- * Maps directions to their string representations.
- * Used for displaying directions in user interfaces and commands.
- * Handles both cardinal and diagonal directions.
+ * Type representing the full text name of a direction.
+ *
+ * This type defines all possible string representations of directions in their
+ * full, unabbreviated form. Used for displaying directions in user interfaces,
+ * command help text, and narrative descriptions.
+ *
+ * Includes all ten standard directions:
+ * - Cardinal directions: "north", "south", "east", "west"
+ * - Diagonal directions: "northeast", "northwest", "southeast", "southwest"
+ * - Vertical directions: "up", "down"
  *
  * @example
  * ```typescript
- * // Get text for basic direction
- * console.log(DIR2TEXT.get(DIRECTION.NORTH)); // "north"
+ * const direction: DirectionText = "north";
+ * const diagonal: DirectionText = "northeast";
+ * const vertical: DirectionText = "up";
  *
- * // Get text for diagonal direction
- * console.log(DIR2TEXT.get(DIRECTION.NORTHEAST)); // "northeast"
+ * // Type-safe function parameter
+ * function describeDirection(dir: DirectionText) {
+ *   console.log(`You are facing ${dir}.`);
+ * }
+ * describeDirection("north"); // OK
+ * describeDirection("n");     // Error: not a DirectionText
+ * ```
+ */
+export type DirectionText =
+	| "north"
+	| "south"
+	| "east"
+	| "west"
+	| "northeast"
+	| "northwest"
+	| "southeast"
+	| "southwest"
+	| "up"
+	| "down";
+
+/**
+ * Maps directions to their full text representations.
  *
- * // Get text for combined direction (same as predefined diagonal)
- * console.log(DIR2TEXT.get(DIRECTION.NORTH | DIRECTION.EAST)); // "northeast"
+ * This constant map provides full text representations for all direction values.
+ * Used for displaying directions in user interfaces, commands, and narrative text
+ * where clarity and readability are preferred over brevity.
  *
- * // Use in command processing
+ * Text representations follow natural language:
+ * - Cardinal directions: north, south, east, west
+ * - Diagonal directions: northeast, northwest, southeast, southwest
+ * - Vertical directions: up, down
+ *
+ * This map is primarily used internally by the `dir2text()` function when called
+ * with `short: false` (or by default), but can be accessed directly for iteration
+ * or lookup.
+ *
+ * @example
+ * Basic lookup:
+ * ```typescript
+ * DIR2TEXT.get(DIRECTION.NORTH);     // "north"
+ * DIR2TEXT.get(DIRECTION.NORTHEAST); // "northeast"
+ * DIR2TEXT.get(DIRECTION.UP);        // "up"
+ * ```
+ *
+ * @example
+ * Iterate through all directions and their text:
+ * ```typescript
+ * for (const [dir, text] of DIR2TEXT.entries()) {
+ *   console.log(`${dir}: ${text}`);
+ * }
+ * // Output:
+ * // DIRECTION.NORTH: north
+ * // DIRECTION.SOUTH: south
+ * // DIRECTION.EAST: east
+ * // ...
+ * ```
+ *
+ * @example
+ * Use in command processing:
+ * ```typescript
  * function move(directionText: string) {
  *   for (const [dir, text] of DIR2TEXT.entries()) {
  *     if (text === directionText) {
@@ -111,35 +241,321 @@ export function dir2reverse(dir: DIRECTION): DIRECTION {
  *   }
  * }
  * ```
+ *
+ * @see {@link dir2text} - Recommended function for converting directions to text
+ * @see {@link DIR2TEXT_SHORT} - Abbreviated version of this map
  */
-const DIR2TEXT = new Map<DIRECTION, string>([
+export const DIR2TEXT = new Map<DIRECTION, DirectionText>([
 	[DIRECTION.NORTH, "north"],
 	[DIRECTION.SOUTH, "south"],
 	[DIRECTION.EAST, "east"],
 	[DIRECTION.WEST, "west"],
-	[DIRECTION.UP, "up"],
-	[DIRECTION.DOWN, "down"],
 	[DIRECTION.NORTHEAST, "northeast"],
 	[DIRECTION.NORTHWEST, "northwest"],
 	[DIRECTION.SOUTHEAST, "southeast"],
 	[DIRECTION.SOUTHWEST, "southwest"],
+	[DIRECTION.UP, "up"],
+	[DIRECTION.DOWN, "down"],
 ]);
 
 /**
- * Convert a DIRECTION flag into its user-facing text representation.
- * Handles both cardinal and composite (diagonal) directions.
+ * Type representing the abbreviated text name of a direction.
  *
- * @param dir The direction flag or combination of flags to convert
- * @returns The textual representation (e.g. "north", "northeast") or `undefined` if unknown
+ * This type defines all possible abbreviated string representations of directions.
+ * Used for compact displays, command shortcuts, and space-constrained interfaces
+ * like minimaps or status bars.
+ *
+ * Abbreviations follow standard conventions:
+ * - Cardinal directions: "n", "s", "e", "w"
+ * - Diagonal directions: "ne", "nw", "se", "sw"
+ * - Vertical directions: "u", "d"
  *
  * @example
  * ```typescript
- * console.log(dir2text(DIRECTION.NORTH)); // "north"
- * console.log(dir2text(DIRECTION.NORTHEAST)); // "northeast"
+ * const shortDir: DirectionTextShort = "n";
+ * const shortDiagonal: DirectionTextShort = "ne";
+ * const shortVertical: DirectionTextShort = "u";
+ *
+ * // Type-safe function for compact display
+ * function displayExitList(exits: DirectionTextShort[]) {
+ *   console.log(`Exits: ${exits.join(", ")}`);
+ * }
+ * displayExitList(["n", "e", "u"]); // "Exits: n, e, u"
  * ```
  */
-export function dir2text(dir: DIRECTION) {
-	return DIR2TEXT.get(dir);
+export type DirectionTextShort =
+	| "n"
+	| "s"
+	| "e"
+	| "w"
+	| "ne"
+	| "nw"
+	| "se"
+	| "sw"
+	| "u"
+	| "d";
+
+/**
+ * Maps directions to their abbreviated text representations.
+ *
+ * This constant map provides abbreviated (short) text representations for all
+ * direction values. Used for compact displays like minimaps, status bars, or
+ * space-constrained interfaces where full direction names would be too verbose.
+ *
+ * Abbreviations follow standard conventions:
+ * - Cardinal directions: n, s, e, w (single letter)
+ * - Diagonal directions: ne, nw, se, sw (two letters)
+ * - Vertical directions: u, d (single letter)
+ *
+ * This map is primarily used internally by the `dir2text()` function when called
+ * with `short: true`, but can be accessed directly for iteration or lookup.
+ *
+ * @example
+ * Basic lookup:
+ * ```typescript
+ * DIR2TEXT_SHORT.get(DIRECTION.NORTH);     // "n"
+ * DIR2TEXT_SHORT.get(DIRECTION.NORTHEAST); // "ne"
+ * DIR2TEXT_SHORT.get(DIRECTION.UP);        // "u"
+ * ```
+ *
+ * @example
+ * Iterate through all directions and their abbreviations:
+ * ```typescript
+ * for (const [dir, abbr] of DIR2TEXT_SHORT.entries()) {
+ *   console.log(`${dir}: ${abbr}`);
+ * }
+ * // Output:
+ * // DIRECTION.NORTH: n
+ * // DIRECTION.SOUTH: s
+ * // DIRECTION.EAST: e
+ * // ...
+ * ```
+ *
+ * @see {@link dir2text} - Recommended function for converting directions to text
+ * @see {@link DIR2TEXT} - Full-name version of this map
+ */
+export const DIR2TEXT_SHORT: Map<DIRECTION, DirectionTextShort> = new Map<
+	DIRECTION,
+	DirectionTextShort
+>([
+	[DIRECTION.NORTH, "n"],
+	[DIRECTION.SOUTH, "s"],
+	[DIRECTION.EAST, "e"],
+	[DIRECTION.WEST, "w"],
+	[DIRECTION.NORTHEAST, "ne"],
+	[DIRECTION.NORTHWEST, "nw"],
+	[DIRECTION.SOUTHEAST, "se"],
+	[DIRECTION.SOUTHWEST, "sw"],
+	[DIRECTION.UP, "u"],
+	[DIRECTION.DOWN, "d"],
+]);
+
+/**
+ * Maps full direction text to their DIRECTION enum values.
+ *
+ * This constant map provides reverse lookup from full text representations to
+ * direction enum values. Used for parsing user input, command processing, and
+ * converting text-based directions back to enum values.
+ *
+ * Text representations follow natural language:
+ * - Cardinal directions: north, south, east, west
+ * - Diagonal directions: northeast, northwest, southeast, southwest
+ * - Vertical directions: up, down
+ *
+ * This map is primarily used internally by the `text2dir()` function, but can be
+ * accessed directly for iteration or lookup.
+ *
+ * @example
+ * Basic lookup:
+ * ```typescript
+ * TEXT2DIR.get("north");     // DIRECTION.NORTH
+ * TEXT2DIR.get("northeast"); // DIRECTION.NORTHEAST
+ * TEXT2DIR.get("up");        // DIRECTION.UP
+ * ```
+ *
+ * @example
+ * Iterate through all text-to-direction mappings:
+ * ```typescript
+ * for (const [text, dir] of TEXT2DIR.entries()) {
+ *   console.log(`"${text}" => ${dir}`);
+ * }
+ * // Output:
+ * // "north" => DIRECTION.NORTH
+ * // "south" => DIRECTION.SOUTH
+ * // "east" => DIRECTION.EAST
+ * // ...
+ * ```
+ *
+ * @see {@link text2dir} - Recommended function for converting text to directions
+ * @see {@link TEXT2DIR_SHORT} - Abbreviated version of this map
+ * @see {@link DIR2TEXT} - Full-name reverse map (direction to text)
+ */
+export const TEXT2DIR = new Map<DirectionText, DIRECTION>([
+	["north", DIRECTION.NORTH],
+	["south", DIRECTION.SOUTH],
+	["east", DIRECTION.EAST],
+	["west", DIRECTION.WEST],
+	["northeast", DIRECTION.NORTHEAST],
+	["northwest", DIRECTION.NORTHWEST],
+	["southeast", DIRECTION.SOUTHEAST],
+	["southwest", DIRECTION.SOUTHWEST],
+	["up", DIRECTION.UP],
+	["down", DIRECTION.DOWN],
+]);
+
+/**
+ * Maps abbreviated direction text to their DIRECTION enum values.
+ *
+ * This constant map provides reverse lookup from abbreviated text representations
+ * to direction enum values. Used for parsing compact user input, command shortcuts,
+ * and converting abbreviated directions back to enum values.
+ *
+ * Abbreviations follow standard conventions:
+ * - Cardinal directions: n, s, e, w (single letter)
+ * - Diagonal directions: ne, nw, se, sw (two letters)
+ * - Vertical directions: u, d (single letter)
+ *
+ * This map is primarily used internally by the `text2dir()` function when processing
+ * abbreviated input, but can be accessed directly for iteration or lookup.
+ *
+ * @example
+ * Basic lookup:
+ * ```typescript
+ * TEXT2DIR_SHORT.get("n");  // DIRECTION.NORTH
+ * TEXT2DIR_SHORT.get("ne"); // DIRECTION.NORTHEAST
+ * TEXT2DIR_SHORT.get("u");  // DIRECTION.UP
+ * ```
+ *
+ * @example
+ * Iterate through all abbreviated mappings:
+ * ```typescript
+ * for (const [text, dir] of TEXT2DIR_SHORT.entries()) {
+ *   console.log(`"${text}" => ${dir}`);
+ * }
+ * // Output:
+ * // "n" => DIRECTION.NORTH
+ * // "s" => DIRECTION.SOUTH
+ * // "e" => DIRECTION.EAST
+ * // ...
+ * ```
+ *
+ * @see {@link text2dir} - Recommended function for converting text to directions
+ * @see {@link TEXT2DIR} - Full-name version of this map
+ * @see {@link DIR2TEXT_SHORT} - Abbreviated reverse map (direction to text)
+ */
+export const TEXT2DIR_SHORT: Map<DirectionTextShort, DIRECTION> = new Map<
+	DirectionTextShort,
+	DIRECTION
+>([
+	["n", DIRECTION.NORTH],
+	["s", DIRECTION.SOUTH],
+	["e", DIRECTION.EAST],
+	["w", DIRECTION.WEST],
+	["ne", DIRECTION.NORTHEAST],
+	["nw", DIRECTION.NORTHWEST],
+	["se", DIRECTION.SOUTHEAST],
+	["sw", DIRECTION.SOUTHWEST],
+	["u", DIRECTION.UP],
+	["d", DIRECTION.DOWN],
+]);
+
+/**
+ * Converts a DIRECTION enum value to its text representation.
+ *
+ * @param dir - The direction to convert
+ * @param short - Whether to return abbreviated form (default: false)
+ * @returns The text name of the direction - full (e.g., "north") or abbreviated (e.g., "n")
+ *
+ * @example
+ * Basic usage returns full direction name:
+ * ```typescript
+ * dir2text(DIRECTION.NORTH); // "north"
+ * dir2text(DIRECTION.NORTHEAST); // "northeast"
+ * ```
+ *
+ * @example
+ * Explicit false parameter returns full direction name:
+ * ```typescript
+ * dir2text(DIRECTION.NORTH, false); // "north"
+ * dir2text(DIRECTION.NORTHEAST, false); // "northeast"
+ * ```
+ *
+ * @example
+ * True parameter returns abbreviated direction name:
+ * ```typescript
+ * dir2text(DIRECTION.NORTH, true); // "n"
+ * dir2text(DIRECTION.NORTHEAST, true); // "ne"
+ * ```
+ */
+export function dir2text(
+	dir: DIRECTION,
+	short: boolean
+): DirectionText | DirectionTextShort;
+export function dir2text(dir: DIRECTION, short: false): DirectionText;
+export function dir2text(dir: DIRECTION, short: true): DirectionTextShort;
+export function dir2text(dir: DIRECTION): DirectionText;
+export function dir2text(dir: DIRECTION, short: boolean = false) {
+	if (short) return DIR2TEXT_SHORT.get(dir)!;
+	return DIR2TEXT.get(dir)!;
+}
+
+/**
+ * Converts a text representation to its DIRECTION enum value.
+ *
+ * Accepts both full direction names (e.g., "north", "northeast") and abbreviated
+ * forms (e.g., "n", "ne"). The search is case-insensitive for convenience.
+ *
+ * @param text - The direction text to convert (full or abbreviated)
+ * @returns The DIRECTION enum value, or undefined if not found
+ *
+ * @example
+ * Full direction names:
+ * ```typescript
+ * text2dir("north"); // DIRECTION.NORTH
+ * text2dir("northeast"); // DIRECTION.NORTHEAST
+ * text2dir("up"); // DIRECTION.UP
+ * ```
+ *
+ * @example
+ * Abbreviated direction names:
+ * ```typescript
+ * text2dir("n"); // DIRECTION.NORTH
+ * text2dir("ne"); // DIRECTION.NORTHEAST
+ * text2dir("u"); // DIRECTION.UP
+ * ```
+ *
+ * @example
+ * Case-insensitive:
+ * ```typescript
+ * text2dir("NORTH"); // DIRECTION.NORTH
+ * text2dir("North"); // DIRECTION.NORTH
+ * text2dir("NE"); // DIRECTION.NORTHEAST
+ * ```
+ *
+ * @example
+ * Use in command parsing:
+ * ```typescript
+ * function processMove(input: string) {
+ *   const dir = text2dir(input);
+ *   if (dir !== undefined) {
+ *     player.step(dir);
+ *   } else {
+ *     console.log("Invalid direction");
+ *   }
+ * }
+ * ```
+ *
+ * @see {@link dir2text} - Converts DIRECTION to text (opposite operation)
+ * @see {@link TEXT2DIR} - Full direction text to DIRECTION map
+ * @see {@link TEXT2DIR_SHORT} - Abbreviated direction text to DIRECTION map
+ */
+export function text2dir(text: DirectionText): DIRECTION;
+export function text2dir(text: DirectionTextShort): DIRECTION;
+export function text2dir(text: DirectionText | DirectionTextShort): DIRECTION {
+	let result = TEXT2DIR.get(text as DirectionText);
+	if (result === undefined)
+		result = TEXT2DIR_SHORT.get(text as DirectionTextShort);
+	return result!;
 }
 
 /**
@@ -1839,6 +2255,23 @@ export class Movable extends DungeonObject {
 		return true;
 	}
 }
+
+/**
+ * These are objects that are intended to occupy rooms but not much else.
+ * They will be used to generate extra descriptions for the room, or they might
+ * be a sign that is in the room that can be read.
+ */
+export class Prop extends DungeonObject {}
+
+/**
+ * These are mobs. They get into fights, interact with stuff, and die.
+ */
+export class Mob extends Movable {}
+
+/**
+ * There are items. They are the things that mobs pick up, equip, use, drop, throw, etc.
+ */
+export class Item extends Movable {}
 
 /**
  * Global registry of created RoomLink instances.

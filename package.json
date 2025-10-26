@@ -20,6 +20,7 @@
 		"typescript": "^5.5.0"
 	},
 	"dependencies": {
-		"mud-ext": "github:jackindisguise/mud-ext"
+		"mud-ext": "github:jackindisguise/mud-ext",
+		"package-loader": "github:jackindisguise/package-loader"
 	}
 }

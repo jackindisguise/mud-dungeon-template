@@ -5,6 +5,7 @@ import {
 	DIRECTION,
 	dir2text,
 	dir2reverse,
+	text2dir,
 	Dungeon,
 	DungeonObject,
 	Room,
@@ -13,34 +14,109 @@ import {
 	getRoomByRef,
 	Movable,
 	RoomLink,
+	DIRECTIONS,
 } from "./dungeon.js";
 
 suite("dungeon.ts", () => {
 	suite("DIRECTION", () => {
 		test("should map directions to their text representations", () => {
-			assert.strictEqual(dir2text(DIRECTION.NORTH), "north");
-			assert.strictEqual(dir2text(DIRECTION.SOUTH), "south");
-			assert.strictEqual(dir2text(DIRECTION.EAST), "east");
-			assert.strictEqual(dir2text(DIRECTION.WEST), "west");
-			assert.strictEqual(dir2text(DIRECTION.UP), "up");
-			assert.strictEqual(dir2text(DIRECTION.DOWN), "down");
-			assert.strictEqual(dir2text(DIRECTION.NORTHEAST), "northeast");
-			assert.strictEqual(dir2text(DIRECTION.NORTHWEST), "northwest");
-			assert.strictEqual(dir2text(DIRECTION.SOUTHEAST), "southeast");
-			assert.strictEqual(dir2text(DIRECTION.SOUTHWEST), "southwest");
+			assert(dir2text(DIRECTION.NORTH) === "north");
+			assert(dir2text(DIRECTION.SOUTH) === "south");
+			assert(dir2text(DIRECTION.EAST) === "east");
+			assert(dir2text(DIRECTION.WEST) === "west");
+			assert(dir2text(DIRECTION.UP) === "up");
+			assert(dir2text(DIRECTION.DOWN) === "down");
+			assert(dir2text(DIRECTION.NORTHEAST) === "northeast");
+			assert(dir2text(DIRECTION.NORTHWEST) === "northwest");
+			assert(dir2text(DIRECTION.SOUTHEAST) === "southeast");
+			assert(dir2text(DIRECTION.SOUTHWEST) === "southwest");
+		});
+
+		test("should map directions to their abbreviated text representations", () => {
+			assert(dir2text(DIRECTION.NORTH, true) === "n");
+			assert(dir2text(DIRECTION.SOUTH, true) === "s");
+			assert(dir2text(DIRECTION.EAST, true) === "e");
+			assert(dir2text(DIRECTION.WEST, true) === "w");
+			assert(dir2text(DIRECTION.UP, true) === "u");
+			assert(dir2text(DIRECTION.DOWN, true) === "d");
+			assert(dir2text(DIRECTION.NORTHEAST, true) === "ne");
+			assert(dir2text(DIRECTION.NORTHWEST, true) === "nw");
+			assert(dir2text(DIRECTION.SOUTHEAST, true) === "se");
+			assert(dir2text(DIRECTION.SOUTHWEST, true) === "sw");
+		});
+
+		test("should map directions to full text with explicit false parameter", () => {
+			assert(dir2text(DIRECTION.NORTH, false) === "north");
+			assert(dir2text(DIRECTION.EAST, false) === "east");
+			assert(dir2text(DIRECTION.NORTHEAST, false) === "northeast");
+		});
+
+		test("should map full text to directions", () => {
+			assert(text2dir("north") === DIRECTION.NORTH);
+			assert(text2dir("south") === DIRECTION.SOUTH);
+			assert(text2dir("east") === DIRECTION.EAST);
+			assert(text2dir("west") === DIRECTION.WEST);
+			assert(text2dir("up") === DIRECTION.UP);
+			assert(text2dir("down") === DIRECTION.DOWN);
+			assert(text2dir("northeast") === DIRECTION.NORTHEAST);
+			assert(text2dir("northwest") === DIRECTION.NORTHWEST);
+			assert(text2dir("southeast") === DIRECTION.SOUTHEAST);
+			assert(text2dir("southwest") === DIRECTION.SOUTHWEST);
+		});
+
+		test("should map abbreviated text to directions", () => {
+			assert(text2dir("n") === DIRECTION.NORTH);
+			assert(text2dir("s") === DIRECTION.SOUTH);
+			assert(text2dir("e") === DIRECTION.EAST);
+			assert(text2dir("w") === DIRECTION.WEST);
+			assert(text2dir("u") === DIRECTION.UP);
+			assert(text2dir("d") === DIRECTION.DOWN);
+			assert(text2dir("ne") === DIRECTION.NORTHEAST);
+			assert(text2dir("nw") === DIRECTION.NORTHWEST);
+			assert(text2dir("se") === DIRECTION.SOUTHEAST);
+			assert(text2dir("sw") === DIRECTION.SOUTHWEST);
+		});
+
+		test("should roundtrip dir2text and text2dir for full names", () => {
+			for (const dir of DIRECTIONS) {
+				const text = dir2text(dir);
+				const convertedBack = text2dir(text);
+				assert(convertedBack === dir, `Failed for ${text}`);
+			}
+		});
+
+		test("should roundtrip dir2text(short) and text2dir for abbreviated names", () => {
+			const directions = [
+				DIRECTION.NORTH,
+				DIRECTION.SOUTH,
+				DIRECTION.EAST,
+				DIRECTION.WEST,
+				DIRECTION.NORTHEAST,
+				DIRECTION.NORTHWEST,
+				DIRECTION.SOUTHEAST,
+				DIRECTION.SOUTHWEST,
+				DIRECTION.UP,
+				DIRECTION.DOWN,
+			];
+
+			for (const dir of directions) {
+				const text = dir2text(dir, true);
+				const convertedBack = text2dir(text);
+				assert(convertedBack === dir, `Failed for ${text}`);
+			}
 		});
 
 		test("should correctly map directions to their opposites", () => {
-			assert.strictEqual(dir2reverse(DIRECTION.NORTH), DIRECTION.SOUTH);
-			assert.strictEqual(dir2reverse(DIRECTION.SOUTH), DIRECTION.NORTH);
-			assert.strictEqual(dir2reverse(DIRECTION.EAST), DIRECTION.WEST);
-			assert.strictEqual(dir2reverse(DIRECTION.WEST), DIRECTION.EAST);
-			assert.strictEqual(dir2reverse(DIRECTION.UP), DIRECTION.DOWN);
-			assert.strictEqual(dir2reverse(DIRECTION.DOWN), DIRECTION.UP);
-			assert.strictEqual(dir2reverse(DIRECTION.NORTHEAST), DIRECTION.SOUTHWEST);
-			assert.strictEqual(dir2reverse(DIRECTION.NORTHWEST), DIRECTION.SOUTHEAST);
-			assert.strictEqual(dir2reverse(DIRECTION.SOUTHEAST), DIRECTION.NORTHWEST);
-			assert.strictEqual(dir2reverse(DIRECTION.SOUTHWEST), DIRECTION.NORTHEAST);
+			assert(dir2reverse(DIRECTION.NORTH) === DIRECTION.SOUTH);
+			assert(dir2reverse(DIRECTION.SOUTH) === DIRECTION.NORTH);
+			assert(dir2reverse(DIRECTION.EAST) === DIRECTION.WEST);
+			assert(dir2reverse(DIRECTION.WEST) === DIRECTION.EAST);
+			assert(dir2reverse(DIRECTION.UP) === DIRECTION.DOWN);
+			assert(dir2reverse(DIRECTION.DOWN) === DIRECTION.UP);
+			assert(dir2reverse(DIRECTION.NORTHEAST) === DIRECTION.SOUTHWEST);
+			assert(dir2reverse(DIRECTION.NORTHWEST) === DIRECTION.SOUTHEAST);
+			assert(dir2reverse(DIRECTION.SOUTHEAST) === DIRECTION.NORTHWEST);
+			assert(dir2reverse(DIRECTION.SOUTHWEST) === DIRECTION.NORTHEAST);
 		});
 	});
 
